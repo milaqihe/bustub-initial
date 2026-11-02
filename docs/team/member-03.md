@@ -9,6 +9,8 @@
 - [lru_k_replacer_test.cpp](../../test/buffer/lru_k_replacer_test.cpp)：你的基础测试，含 `SampleTest`、`Evict`、`Size`、`ConcurrencyTest`。
 - [接口约定](../INTERFACES.md)：淘汰语义、合法帧编号及与 4 号的调用关系。
 
+课程附件提供[LRU-K 头文件](../../references/P1_src/include/buffer/lru_k_replacer.h)和[参考实现](../../references/P1_src/buffer/lru_k_replacer.cpp)。其成熟帧排序与通用 LRU-K 定义有出入，先读[参考说明](../../references/README.md)，再在正式 `src/` 中完成实现。
+
 ## 按顺序完成
 
 1. 确定每帧状态：最近 K 次访问时间、是否可淘汰、是否存在记录；选用合适的内部容器。

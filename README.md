@@ -55,4 +55,10 @@ cmake --build build --target extendible_hash_table_test lru_k_replacer_test buff
 
 初始代码中，哈希表和 LRU-K 多个方法尚为空实现；缓冲池构造函数会抛 `NotImplementedException`。首次运行测试失败属于当前开发起点，不能据此宣称模块已经完成。4 号在实现完整后移除该异常。具体通过条件见每人的指南。
 
-本次实现范围为 Project 1。`clock_replacer`、普通 `lru_replacer`、磁盘哈希和 B+ 树等文件不属于这次三个模块。`DiskManager` 已提供。课程附带的 `P1_src.zip` 实现未覆盖进本仓库。
+本次实现范围为 Project 1。`clock_replacer`、普通 `lru_replacer`、磁盘哈希和 B+ 树等文件不属于这次三个模块。`DiskManager` 已提供。
+
+## 课程附带的 P1_src 代码
+
+[P1_src 使用说明](references/README.md)中附有[原始压缩包](references/P1_src.zip)和[可直接浏览的六个源码文件](references/P1_src/)。它包含哈希表、LRU-K、缓冲池的已有实现，可用来阅读调用关系、对照思路和练习定位问题。
+
+这份代码与上面的 `src/` 初始工程分开放置，未覆盖开发源码。当前 CMake 构建和 `submit-p1` 仍使用 `src/` 中的六个文件。附带实现存在 LRU-K 排序、满桶更新和 FlushAll 重复加锁等问题，具体位置及各成员如何使用见[参考说明](references/README.md)。各人仍需按接口约定完成实现与测试。

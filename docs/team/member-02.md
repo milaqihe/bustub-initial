@@ -13,6 +13,8 @@
 
 本次实现的是内存哈希表，不是 `src/container/disk/hash/` 中的磁盘哈希表。先读[接口约定](../INTERFACES.md)。
 
+课程附件的[哈希表头文件](../../references/P1_src/include/container/hash/extendible_hash_table.h)和[参考实现](../../references/P1_src/container/hash/extendible_hash_table.cpp)可直接对照阅读。先看[P1_src 使用说明与已发现问题](../../references/README.md)，实际开发仍修改上表中的 `src/` 文件。
+
 ## 按顺序完成
 
 1. 构造函数创建一个局部深度为 0 的桶，目录大小为 1；全局深度 0、桶数 1，与类中初值一致。

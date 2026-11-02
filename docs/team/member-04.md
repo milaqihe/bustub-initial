@@ -15,6 +15,8 @@
 
 本版本方法名是 `NewPgImp`、`FetchPgImp`、`UnpinPgImp`、`FlushPgImp`、`FlushAllPgsImp`、`DeletePgImp`。不要按教程中另一版本的拼写新建重复文件或方法。
 
+课程附件提供[缓冲池头文件](../../references/P1_src/include/buffer/buffer_pool_manager_instance.h)和[参考实现](../../references/P1_src/buffer/buffer_pool_manager_instance.cpp)。阅读其页面操作流程时，同时查看[参考说明中的锁与 dirty 问题](../../references/README.md)；实现改动提交到正式 `src/`，参考目录不参与构建。
+
 ## 先准备公共逻辑
 
 1. 阅读[接口与状态约定](../INTERFACES.md)，和 2、3 号确认调用行为。
