@@ -1,15 +1,10 @@
-cd build
-cmake ..
+#!/usr/bin/env bash
+set -euo pipefail
 
-# make format
-make format
-make check-lint
-make check-clang-tidy-p1
+p1_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+p1_build_dir="${1:-${p1_root}/build}"
+p1_cmake="${P1_CMAKE:-cmake}"
 
-# RUN for build test p1
-make extendible_hash_table_test
-make lru_k_replacer_test
-make buffer_pool_manager_instance_test
-./test/extendible_hash_table_test
-./test/lru_k_replacer_test
-./test/buffer_pool_manager_instance_test
+# Reuse configured toolchain/Sanitizer settings. Never format source in place.
+"$p1_cmake" -S "$p1_root" -B "$p1_build_dir"
+"$p1_cmake" --build "$p1_build_dir" --target check-p1 -j "${P1_JOBS:-4}"

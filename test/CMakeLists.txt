@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 include(GoogleTest)
 
-file(GLOB_RECURSE BUSTUB_TEST_SOURCES "${PROJECT_SOURCE_DIR}/test/*/*test.cpp")
+file(GLOB_RECURSE BUSTUB_TEST_SOURCES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/test/*/*test.cpp")
 
 # #####################################################################################################################
 # MAKE TARGETS
@@ -18,6 +18,8 @@ add_custom_target(check-public-ci-tests COMMAND ${CMAKE_CTEST_COMMAND} --verbose
 # #########################################
 # "make XYZ_test"
 # #########################################
+set(BUSTUB_P1_TEST_TARGETS)
+set(BUSTUB_P1_TEST_SOURCES)
 foreach (bustub_test_source ${BUSTUB_TEST_SOURCES})
     # Create a human readable name.
     get_filename_component(bustub_test_filename ${bustub_test_source} NAME)
@@ -28,6 +30,15 @@ foreach (bustub_test_source ${BUSTUB_TEST_SOURCES})
     add_dependencies(build-tests ${bustub_test_name})
     add_dependencies(check-tests ${bustub_test_name})
 
+    # Label only Project 1 tests; optional quality tests join the same gate.
+    set(bustub_test_label other)
+    if (bustub_test_name MATCHES "^(extendible_hash_table|lru_k_replacer|buffer_pool_manager_instance)_test$"
+            OR bustub_test_name MATCHES "^p1_(quality|integration)_.*_test$")
+        set(bustub_test_label p1)
+        list(APPEND BUSTUB_P1_TEST_TARGETS ${bustub_test_name})
+        list(APPEND BUSTUB_P1_TEST_SOURCES ${bustub_test_source})
+    endif ()
+
     gtest_discover_tests(${bustub_test_name}
             EXTRA_ARGS
             --gtest_color=auto
@@ -36,6 +47,7 @@ foreach (bustub_test_source ${BUSTUB_TEST_SOURCES})
             DISCOVERY_TIMEOUT 120
             PROPERTIES
             TIMEOUT 120
+            LABELS ${bustub_test_label}
             )
 
     target_link_libraries(${bustub_test_name} bustub gtest gmock_main)
@@ -47,6 +59,9 @@ foreach (bustub_test_source ${BUSTUB_TEST_SOURCES})
             COMMAND ${bustub_test_name}
             )
 endforeach ()
+
+set(BUSTUB_P1_TEST_TARGETS ${BUSTUB_P1_TEST_TARGETS} PARENT_SCOPE)
+set(BUSTUB_P1_TEST_SOURCES ${BUSTUB_P1_TEST_SOURCES} PARENT_SCOPE)
 
 set(BUSTUB_SLT_SOURCES
         "${PROJECT_SOURCE_DIR}/test/sql/p3.01-seqscan.slt"
