@@ -6,9 +6,9 @@
 
 - [根 CMakeLists.txt](../../CMakeLists.txt)：C++17、Sanitizer、静态检查、P1 六文件清单和 `submit-p1`。
 - [测试 CMakeLists.txt](../../test/CMakeLists.txt)：按 `test/*/*test.cpp` 自动生成测试目标。
-- [原有 P1 测试脚本](../../p1_test.sh)：包含全工程 format，运行前注意修改范围。
+- [P1 测试入口](../../p1_test.sh)：构建并运行 P1，失败立即返回非零，不自动修改源码格式。
 - [环境搭建](../BUILD.md)、[接口约定](../INTERFACES.md)、[集成记录](../../reports/p1/integration.md)。
-- [原有 CI](../../.github/workflows/cmake.yml)：当前监听 master，与本仓库 main 不一致，不能当成已有 P1 PR 验证。
+- [P1 CI](../../.github/workflows/cmake.yml)：监听 main、团队分支与 main 的 PR，使用 Ubuntu 22.04、Clang 14、CMake 3.31.10 和 ASan。
 
 ## 具体任务
 
@@ -41,7 +41,8 @@ cmake --build build --target extendible_hash_table_test lru_k_replacer_test buff
 ./build/test/extendible_hash_table_test
 ./build/test/lru_k_replacer_test
 ./build/test/buffer_pool_manager_instance_test
-cmake --build build --target check-format check-lint check-clang-tidy-p1
+cmake --build build --target check-p1 -j 4
+cmake --build build --target check-p1-format check-p1-lint check-clang-tidy-p1
 ```
 
 5 号新增目标按实际文件名另行构建运行。所有最终结果记录到[集成记录](../../reports/p1/integration.md)。

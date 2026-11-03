@@ -1,114 +1,84 @@
-name: CMake Build Matrix
+name: Project 1
 
 on:
   push:
-    branches: [master]
+    branches: [main, 'team/**']
   pull_request:
-    branches: [master]
+    branches: [main]
+  workflow_dispatch:
 
-env:
-  BUILD_TYPE: Debug
+permissions:
+  contents: read
+
+concurrency:
+  group: p1-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-    name: ${{ matrix.config.name }}
-    runs-on: ${{ matrix.config.os }}
-
-    strategy:
-      fail-fast: true
-      matrix:
-        config:
-          - {
-              name: "Ubuntu 22.04 GCC",
-              os: "ubuntu-22.04",
-              cc: "/usr/bin/gcc",
-              cxx: "/usr/bin/g++",
-              format: "/usr/bin/clang-format-12",
-              tidy: "/usr/bin/clang-tidy-12",
-            }
-          - {
-              name: "Ubuntu 20.04 GCC",
-              os: "ubuntu-20.04",
-              cc: "/usr/bin/gcc",
-              cxx: "/usr/bin/g++",
-              format: "/usr/bin/clang-format-12",
-              tidy: "/usr/bin/clang-tidy-12",
-            }
-          - {
-              name: "Ubuntu 22.04 Clang",
-              os: "ubuntu-22.04",
-              cc: "/usr/bin/clang-12",
-              cxx: "/usr/bin/clang++-12",
-              format: "/usr/bin/clang-format-12",
-              tidy: "/usr/bin/clang-tidy-12",
-            }
-          - {
-              name: "Ubuntu 20.04 Clang",
-              os: "ubuntu-20.04",
-              cc: "/usr/bin/clang-12",
-              cxx: "/usr/bin/clang++-12",
-              format: "/usr/bin/clang-format-12",
-              tidy: "/usr/bin/clang-tidy-12",
-            }
-          - {
-              name: "macOS 11 (Big Sur) AppleClang",
-              os: macos-11,
-              cc: "/usr/bin/clang",
-              cxx: "/usr/bin/clang++",
-              format: "/usr/local/opt/llvm@12/bin/clang-format",
-              tidy: "/usr/local/opt/llvm@12/bin/clang-tidy",
-            }
-          - {
-              name: "macOS 12 (Monterey) AppleClang",
-              os: macos-12,
-              cc: "/usr/bin/clang",
-              cxx: "/usr/bin/clang++",
-              format: "/usr/local/opt/llvm@12/bin/clang-format",
-              tidy: "/usr/local/opt/llvm@12/bin/clang-tidy",
-            }
+  p1:
+    name: P1 Clang 14 ASan
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
-      - name: Print env
+      - name: Install project toolchain
         run: |
-          echo github.event.action: ${{ github.event.action }}
-          echo github.event_name: ${{ github.event_name }}
-      - name: Install Dependencies (Ubuntu)
-        if: runner.os == 'Linux'
-        working-directory: ${{github.workspace}}
-        run: sudo bash ./build_support/packages.sh -y
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang-14 clang-format-14 clang-tidy-14 python3 python3-pip pkg-config zlib1g-dev zip
 
-      - name: Install Dependencies (OSX)
-        if: runner.os == 'macOS'
-        working-directory: ${{github.workspace}}
-        run: bash ./build_support/packages.sh -y
+      - name: Install consistent CMake
+        run: |
+          python3 -m pip install --user "cmake==3.31.10"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Configure CMake
-        run: CC=${{matrix.config.cc}} CXX=${{matrix.config.cxx}} cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCLANG_FORMAT_BIN=${{matrix.config.format}} -DCLANG_TIDY_BIN=${{matrix.config.tidy}}
+      - name: Configure
+        run: >-
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+          -DBUSTUB_SANITIZER=address
+          -DCMAKE_C_COMPILER=clang-14 -DCMAKE_CXX_COMPILER=clang++-14
+          -DCLANG_FORMAT_BIN=clang-format-14 -DCLANG_TIDY_BIN=clang-tidy-14
 
-      - name: Build
-        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+      - name: Build P1 tests
+        id: build
+        run: cmake --build build --target build-p1-tests -j 4
 
-      - name: Check Format
-        working-directory: ${{github.workspace}}/build
-        run: make check-format
+      - name: Run P1 tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+        run: ctest --test-dir build --output-on-failure --no-tests=error -L '^p1$'
 
-      - name: Check Lint
-        working-directory: ${{github.workspace}}/build
-        run: make check-lint
+      - name: Check P1 format and lint
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: cmake --build build --target check-p1-format check-p1-lint
 
-      - name: Check Clang Tidy
-        if: matrix.config.os == 'macos-12' || matrix.config.os == 'ubuntu-22.04'
-        working-directory: ${{github.workspace}}/build
-        run: make check-clang-tidy
+      - name: Check P1 clang-tidy
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: cmake --build build --target check-clang-tidy-p1
 
-      - name: Check Tests (Ubuntu)
-        if: runner.os == 'Linux'
-        working-directory: ${{github.workspace}}/build
-        run: make build-tests && make check-public-ci-tests
+      - name: Package successful P1 build
+        if: ${{ success() }}
+        run: cmake --build build --target submit-p1
 
-      - name: Check Tests (OSX)
-        if: runner.os == 'macOS'
-        working-directory: ${{github.workspace}}/build
-        # Disable container overflow checks on OSX
-        run: make build-tests && make check-public-ci-tests
+      - name: Preserve test diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: p1-test-diagnostics
+          path: |
+            build/Testing/Temporary/LastTest.log
+            build/test/*.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Preserve successful submission package
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: project1-submission
+          path: project1-submission.zip
+          if-no-files-found: error
+          retention-days: 7

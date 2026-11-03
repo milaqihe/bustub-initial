@@ -97,7 +97,7 @@ git merge origin/main
 
 ## 7 1 号合并与后续工作
 
-1 号先在本地集成分支审阅变更、运行所需测试，再在 GitHub 合并对应 PR。集成顺序见[五人任务表](team/README.md)。当前原有 CI 只监听 `master`，1 号适配前以实际本地记录为合并依据。
+1 号先在本地集成分支审阅变更、运行所需测试，再在 GitHub 合并对应 PR。集成顺序见[五人任务表](team/README.md)。P1 CI 配置监听 main、团队分支推送和 main 的 PR；首次推送后需查看实际 Actions 结果，并结合本地测试记录审阅。
 
 PR 合并后，所有同学在干净工作区更新本地 main：
 
