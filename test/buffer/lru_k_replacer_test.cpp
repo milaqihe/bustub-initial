@@ -563,4 +563,128 @@ TEST(LRUKReplacerTest, ConcurrencyTest) {  // NOLINT
     ASSERT_EQ(i, evicted_elements[i - 500]);
   }
 }
+
+TEST(LRUKReplacerTest, K1BehavesLikePlainLRU) {
+  LRUKReplacer r(10, 1);
+  r.RecordAccess(1);
+  r.RecordAccess(2);
+  r.RecordAccess(1);
+  r.SetEvictable(1, true);
+  r.SetEvictable(2, true);
+
+  frame_id_t victim = -1;
+  ASSERT_TRUE(r.Evict(&victim));
+  ASSERT_EQ(2, victim);
+  ASSERT_TRUE(r.Evict(&victim));
+  ASSERT_EQ(1, victim);
+  ASSERT_EQ(0, r.Size());
+}
+
+TEST(LRUKReplacerTest, EvictUsesBackwardKthNotMostRecent) {
+  LRUKReplacer r(10, 2);
+  r.RecordAccess(1);
+  r.RecordAccess(2);
+  r.RecordAccess(2);
+  r.RecordAccess(1);
+  r.SetEvictable(1, true);
+  r.SetEvictable(2, true);
+
+  frame_id_t victim = -1;
+  ASSERT_TRUE(r.Evict(&victim));
+  ASSERT_EQ(1, victim) << "should evict by backward-k distance, not by most recent access";
+}
+
+TEST(LRUKReplacerTest, FramesBelowKUseEarliestHistory) {
+  LRUKReplacer r(10, 3);
+  r.RecordAccess(1);
+  r.RecordAccess(2);
+  r.RecordAccess(1);
+  r.SetEvictable(1, true);
+  r.SetEvictable(2, true);
+
+  frame_id_t victim = -1;
+  ASSERT_TRUE(r.Evict(&victim));
+  ASSERT_EQ(1, victim) << "inf-distance frames are ordered by earliest access, both still < K";
+}
+
+TEST(LRUKReplacerTest, EvictedFrameStartsFreshHistory) {
+  LRUKReplacer r(10, 3);
+  r.RecordAccess(2);
+  r.RecordAccess(2);
+  r.RecordAccess(2);
+  r.RecordAccess(1);
+  r.RecordAccess(1);
+  r.SetEvictable(2, true);
+  r.SetEvictable(1, true);
+
+  frame_id_t victim = -1;
+  ASSERT_TRUE(r.Evict(&victim));
+  ASSERT_EQ(1, victim);
+
+  r.RecordAccess(1);
+  r.SetEvictable(1, true);
+  ASSERT_TRUE(r.Evict(&victim));
+  ASSERT_EQ(1, victim) << "history must be dropped on eviction";
+}
+
+TEST(LRUKReplacerTest, SetEvictableIsIdempotent) {
+  LRUKReplacer r(10, 2);
+  r.RecordAccess(1);
+  ASSERT_EQ(0, r.Size());
+
+  r.SetEvictable(1, true);
+  ASSERT_EQ(1, r.Size());
+  r.SetEvictable(1, true);
+  ASSERT_EQ(1, r.Size());
+
+  r.SetEvictable(1, false);
+  ASSERT_EQ(0, r.Size());
+  r.SetEvictable(1, false);
+  ASSERT_EQ(0, r.Size());
+}
+
+TEST(LRUKReplacerTest, SetEvictableOnUnknownFrameCreatesNothing) {
+  LRUKReplacer r(10, 2);
+  r.SetEvictable(7, true);
+  ASSERT_EQ(0, r.Size());
+
+  frame_id_t victim = -1;
+  ASSERT_FALSE(r.Evict(&victim)) << "no history yet, nothing to evict";
+}
+
+TEST(LRUKReplacerTest, InvalidFrameIdThrows) {
+  LRUKReplacer r(10, 2);
+  ASSERT_THROW(r.RecordAccess(-1), std::invalid_argument);
+  ASSERT_THROW(r.RecordAccess(10), std::invalid_argument);
+  ASSERT_THROW(r.SetEvictable(-1, true), std::invalid_argument);
+  ASSERT_THROW(r.SetEvictable(10, true), std::invalid_argument);
+  ASSERT_THROW(r.Remove(-1), std::invalid_argument);
+  ASSERT_THROW(r.Remove(10), std::invalid_argument);
+}
+
+TEST(LRUKReplacerTest, RemoveNonEvictableThrows) {
+  LRUKReplacer r(10, 2);
+  r.RecordAccess(3);
+  ASSERT_THROW(r.Remove(3), std::invalid_argument);
+
+  r.SetEvictable(3, true);
+  ASSERT_NO_THROW(r.Remove(3));
+  ASSERT_EQ(0, r.Size());
+
+  ASSERT_NO_THROW(r.Remove(3));
+}
+
+TEST(LRUKReplacerTest, K3MixedOrder) {
+  LRUKReplacer r(10, 3);
+  for (int f : {1, 1, 2, 3, 1, 2, 2}) {
+    r.RecordAccess(f);
+  }
+  r.SetEvictable(1, true);
+  r.SetEvictable(2, true);
+  r.SetEvictable(3, true);
+
+  frame_id_t victim = -1;
+  ASSERT_TRUE(r.Evict(&victim));
+  ASSERT_EQ(3, victim);
+}
 }  // namespace bustub
