@@ -176,6 +176,15 @@ class BufferPoolManagerInstance : public BufferPoolManager {
     // This is a no-nop right now without a more complex data structure to track deallocated pages
   }
 
-  // TODO(student): You may add additional private members and helper functions
+  /**
+   * @brief Obtain a frame the caller may reuse: take one from the free list first, and only when the free list
+   * is empty evict a frame through the replacer. A dirty victim page is written back before the frame is reused.
+   *
+   * The caller must already hold latch_.
+   *
+   * @param[out] frame_id the frame id that was obtained
+   * @return true if a frame was obtained, false if every frame is currently pinned
+   */
+  auto AcquireFrame(frame_id_t *frame_id) -> bool;
 };
 }  // namespace bustub
