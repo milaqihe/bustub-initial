@@ -35,7 +35,7 @@ TEST(P1QualityLRUKTest, RemoveAndReuseClearsHistoryAndSize) {
 
   replacer.Remove(0);
   EXPECT_EQ(replacer.Size(), 1);
-  replacer.Remove(0);  // Missing frame is a no-op.
+  replacer.Remove(0);        // Missing frame is a no-op.
   replacer.RecordAccess(0);  // Reused frame now has just one access.
   replacer.SetEvictable(0, true);
   EXPECT_EQ(replacer.Size(), 2);

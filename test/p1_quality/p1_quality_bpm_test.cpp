@@ -65,7 +65,7 @@ TEST(P1QualityBPMTest, FlushAllSkipsUnusedFramesAndFlushPreservesPin) {
   Page *again = bpm.FetchPage(id);
   ASSERT_EQ(again, page);
   ASSERT_EQ(again->GetPinCount(), 1);
-  EXPECT_TRUE(bpm.FlushPage(id));      // Flush also writes a clean page.
+  EXPECT_TRUE(bpm.FlushPage(id));  // Flush also writes a clean page.
   EXPECT_EQ(disk.GetNumWrites(), 2);
   EXPECT_EQ(again->GetPinCount(), 1);  // Flush does not unpin.
   EXPECT_EQ(again->GetData()[0], 'Q');
