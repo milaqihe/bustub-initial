@@ -65,16 +65,143 @@ TSan 使用独立构建目录，以 `-DBUSTUB_SANITIZER=thread` 编译并运行�
 
 ## 5 缓冲池设计与流程图
 
-4 号提供实际实现；5 号据此绘图并核对，不把流程示意直接当作已实现结果。
+### 5.1 模块组成
 
-- NewPage：选择帧→必要时写回→清旧映射→新页初始化→记录访问并固定。
-- FetchPage：缓存命中路径与磁盘读入路径。
-- UnpinPage：引用计数、dirty 合并和可淘汰状态。
-- FlushPage / FlushAllPages：写回、清 dirty 与锁处理。
-- DeletePage：pinned 检查、移除历史/映射、回收帧。
-- 说明避免 FlushAll 重复加锁死锁的方法。
+| 成员 | 类型 | 作用 |
+| --- | --- | --- |
+| `pages_` | `Page *`（`new Page[pool_size_]`） | 帧数组，下标即帧号；每帧存放一页的 4KB 数据与元数据 `page_id_`、`pin_count_`、`is_dirty_` |
+| `page_table_` | `ExtendibleHashTable<page_id_t, frame_id_t> *` | 页号到帧号的映射，命中判断全部依赖它 |
+| `replacer_` | `LRUKReplacer *` | 记录每帧的访问历史与可淘汰状态，决定池满时淘汰谁 |
+| `free_list_` | `std::list<frame_id_t>` | 尚未装入任何页的空闲帧号 |
+| `disk_manager_` | `DiskManager *` | 提供 `ReadPage`、`WritePage`，按 `page_id × 4096` 计算磁盘偏移 |
+| `latch_` | `std::mutex` | 保护以上所有结构，六个接口入口统一加锁 |
+| `next_page_id_` | `std::atomic<page_id_t>` | 由 `AllocatePage()` 递增分配新页号 |
 
-至少补上 NewPage/FetchPage 的流程图和 pin/evictable 状态图；图中方法名与实际代码一致。
+帧的选取逻辑集中在一个私有辅助函数 `AcquireFrame` 中，由 `NewPage` 与 `FetchPage` 的未命中路径共用，避免两处重复同一套淘汰代码。
+
+### 5.2 帧分配：AcquireFrame
+
+```mermaid
+flowchart TD
+    A["AcquireFrame(frame_id_t *frame_id)"] --> B{"free_list_ 非空？"}
+    B -- "是" --> C["*frame_id = free_list_.front()<br/>free_list_.pop_front()"]
+    C --> Z["返回 true"]
+    B -- "否" --> D["replacer_->Evict(frame_id)"]
+    D -- "false：池满且无可淘汰帧" --> E["返回 false"]
+    D -- "true" --> V["Page *victim = &pages_[*frame_id]"]
+    V --> F{"victim->IsDirty() ？"}
+    F -- "是" --> G["disk_manager_->WritePage(victim->page_id_, victim->GetData())"]
+    G --> H["page_table_->Remove(victim->page_id_)"]
+    F -- "否" --> H
+    H --> I["victim->ResetMemory()<br/>victim->page_id_ = INVALID_PAGE_ID<br/>victim->pin_count_ = 0<br/>victim->is_dirty_ = false"]
+    I --> Z
+```
+
+顺序上有三个要点：
+
+1. **空闲帧优先**：`free_list_` 还有帧时直接取用，不惊动替换器；
+2. **写回早于清空**：写回依赖 `victim` 的 `page_id_` 与 `GetData()`，一旦执行 `ResetMemory()` 与 `page_id_ = INVALID_PAGE_ID`，两者都已消失。把 `page_table_->Remove` 放在写回之后，保证"帧里装着页 ⇒ 页表中必有该映射"这条关系全程成立；
+3. **四个字段全部复位**：其中 `page_id_ = INVALID_PAGE_ID` 是 `FlushAllPgsImp` 判断"空帧"的依据，该函数遍历的是 `pages_` 全部帧，漏掉这行会让空帧被当成有效页写回磁盘。
+
+### 5.3 NewPage
+
+```mermaid
+flowchart TD
+    A["NewPgImp(page_id_t *page_id)"] --> B["std::scoped_lock lock(latch_)"]
+    B --> C{"AcquireFrame(&frame_id)"}
+    C -- "false" --> D["返回 nullptr"]
+    C -- "true" --> E["page_id_t new_page_id = AllocatePage()"]
+    E --> F["Page *page = &pages_[frame_id]"]
+    F --> G["page->ResetMemory()"]
+    G --> H["page->page_id_ = new_page_id<br/>page->is_dirty_ = false<br/>page->pin_count_ = 1"]
+    H --> I["page_table_->Insert(new_page_id, frame_id)"]
+    I --> J["replacer_->RecordAccess(frame_id)"]
+    J --> K["replacer_->SetEvictable(frame_id, false)"]
+    K --> L["*page_id = new_page_id<br/>返回 page"]
+```
+
+新页返回时 `pin_count_ = 1`，调用者必须先 `UnpinPage`，它才可能被淘汰。
+
+### 5.4 FetchPage
+
+```mermaid
+flowchart TD
+    A["FetchPgImp(page_id_t page_id)"] --> B["std::scoped_lock lock(latch_)"]
+    B --> C{"page_table_->Find(page_id, frame_id) 命中？"}
+    C -- "命中" --> D["Page *page = &pages_[frame_id]<br/>page->pin_count_++"]
+    D --> E["replacer_->RecordAccess(frame_id)"]
+    E --> F["replacer_->SetEvictable(frame_id, false)"]
+    F --> G["返回 page（不重置数据区）"]
+    C -- "未命中" --> H{"AcquireFrame(&frame_id)"}
+    H -- "false" --> I["返回 nullptr"]
+    H -- "true" --> J["Page *page = &pages_[frame_id]<br/>page->ResetMemory()<br/>page->page_id_ = page_id<br/>page->is_dirty_ = false<br/>page->pin_count_ = 1"]
+    J --> K["disk_manager_->ReadPage(page_id, page->GetData())"]
+    K --> L["page_table_->Insert(page_id, frame_id)"]
+    L --> M["replacer_->RecordAccess(frame_id)"]
+    M --> N["replacer_->SetEvictable(frame_id, false)"]
+    N --> G
+```
+
+命中路径**不做** `ResetMemory()`：内存中的内容已经是最新数据，清零会直接抹掉它；只有未命中、需要从磁盘读入时才先清零。
+
+### 5.5 其余四个接口
+
+| 接口 | 关键步骤 | 返回值语义 |
+| --- | --- | --- |
+| `UnpinPgImp(page_id, is_dirty)` | `page_table_->Find` → `pin_count_ <= 0` 直接拒绝 → `pin_count_--` → `is_dirty` 为真时置 `is_dirty_ = true`（**只置真，不清假**）→ 仅当计数归零才 `SetEvictable(frame_id, true)` | 页不在池中或计数已为 0 时返回 `false` |
+| `FlushPgImp(page_id)` | `page_id == INVALID_PAGE_ID` 直接拒绝 → `Find` → **无论脏否都调用** `WritePage(page_id, page->GetData())` → `is_dirty_ = false` | 页不在池中返回 `false` |
+| `FlushAllPgsImp()` | 取一次锁，遍历 `pages_` 全部帧，`page_id_ != INVALID_PAGE_ID` 才视为有效页，逐帧 `WritePage` 并清 `is_dirty_` | 无返回值（`void`） |
+| `DeletePgImp(page_id)` | `Find` 失败直接返回 `true`（幂等）→ `pin_count_ > 0` 返回 `false` → 依次 `page_table_->Remove`、`replacer_->Remove`、`free_list_.push_back` → 复位四字段 → `DeallocatePage(page_id)` | 不在池中或删除成功为 `true`，被 pin 住为 `false` |
+
+四个易错点：
+
+1. `UnpinPage(is_dirty=false)` 不能清除已有脏标记，否则一次无心的 unpin 会把尚未落盘的修改"洗白"，数据静默丢失；
+2. `FlushPage` 不判断脏否都要写，因为调用方要求的是"把这一页的内容落盘"，保证磁盘上此页内容是最新的；
+3. `DeletePage` **不写回**：页是被销毁而不是迁走；同时必须把 `page_id_` 复位为 `INVALID_PAGE_ID`；
+4. `DeallocatePage` 在当前框架中是空实现（骨架注释说明暂无可回收页号的数据结构），页号不会被复用。
+
+### 5.6 pin 与 evictable 的状态迁移
+
+```mermaid
+stateDiagram-v2
+    state "Free：空闲帧（page_id_ == INVALID_PAGE_ID）" as Free
+    state "Pinned：被引用（pin_count_ > 0）" as Pinned
+    state "Clean：可淘汰且干净（pin_count_ == 0 且 is_dirty_ == false）" as Clean
+    state "Dirty：可淘汰且为脏（pin_count_ == 0 且 is_dirty_ == true）" as Dirty
+
+    [*] --> Free: 构造时 pool_size_ 个帧全部填入 free_list_
+    Free --> Pinned: NewPage / FetchPage 未命中取到该帧，pin_count_ = 1
+    Pinned --> Pinned: FetchPage 命中，pin_count_++
+    Pinned --> Clean: UnpinPage 后 pin_count_ 归零且 is_dirty_ == false
+    Pinned --> Dirty: UnpinPage 后 pin_count_ 归零且 is_dirty_ == true
+    Clean --> Pinned: FetchPage 命中，SetEvictable(frame_id, false)
+    Dirty --> Pinned: FetchPage 命中，SetEvictable(frame_id, false)
+    Dirty --> Clean: FlushPage / FlushAllPages 写回并清 is_dirty_
+    Clean --> Free: 被 Evict 选中（不写回）或 DeletePage 清理后归还
+    Dirty --> Free: 被 Evict 选中则先 WritePage 再清空；DeletePage 归还则不写回
+```
+
+四个状态的含义：
+
+- **Free**：`page_id_ == INVALID_PAGE_ID`，位于 `free_list_`；
+- **Pinned**：`pin_count_ > 0`，`replacer_` 中标记为不可淘汰，任何淘汰都不会选它；
+- **Clean**：`pin_count_ == 0 && is_dirty_ == false`，是 `Evict` 的候选且淘汰时无需写回；
+- **Dirty**：`pin_count_ == 0 && is_dirty_ == true`，仍是候选，但被选中时必须先 `WritePage`。
+
+`DeletePage` 只在 `pin_count_ == 0` 时才能执行，`pin > 0` 会返回 `false`，因为持有者仍在读写的帧一旦被清空，其指针就会落到别人的数据上。
+
+### 5.7 关键不变量与死锁避免
+
+实现中始终维持以下不变量：
+
+1. **映射与帧内挂牌一致**：`page_table_` 中每条 `page_id → frame_id`，该帧的 `page_id_` 必须等于这个 `page_id`；
+2. **可淘汰集合与 pin 集合一致**：`replacer_` 中标记为可淘汰的帧，正好是池内 `pin_count_ == 0` 的帧；
+3. **命中不重置内存**：`FetchPage` 命中路径只改计数与替换器状态；
+4. **脏标记只置真**：`UnpinPage(is_dirty=false)` 不得清掉已有脏标记；
+5. **删除不写回且必须复位 `page_id_`**：否则 `FlushAllPgsImp` 会把已删除的页重新写回磁盘；
+6. **`free_list_` 中的帧必为空帧**：`AcquireFrame` 从空闲链表取帧时不再清零，因此归还前必须完成复位。
+
+`FlushAllPages` 的死锁避免方式：实现中 `FlushAllPgsImp` **没有调用** `FlushPgImp`。`std::mutex` 不可重入，而 `FlushAllPgsImp` 已经持有了 `latch_`，若再调用入口同样加锁的 `FlushPgImp`，同一线程会二次加锁并永久阻塞。因此它在持锁状态下直接遍历 `pages_` 数组、直接调用 `disk_manager_->WritePage`，把"公开接口"与"内部批量实现"分成两条路径。
 
 ## 6 测试方法与结果
 
@@ -114,7 +241,10 @@ TSan 使用独立构建目录，以 `-DBUSTUB_SANITIZER=thread` 编译并运行�
 - **1 号：如何复现测试与打包？** 先同步要验收的分支并记录提交号，按第 2 章配置 Debug + ASan，执行 `check-p1`、格式、lint 和 clang-tidy；TSan 在独立目录运行。最终 `main` 验收通过后执行 `submit-p1`，根据 `CMakeLists.txt` 的 `P1_FILES` 核对压缩包的六个源码文件。`test/CMakeLists.txt` 负责测试发现、P1 标签与超时，`cmake/Project1.cmake` 定义统一测试入口，`.github/workflows/cmake.yml` 记录 CI 的实际执行顺序。
 - 2 号：何时拆桶、何时翻倍？为什么满桶更新已有键不拆分？
 - 3 号：为何 A=1/9、B=2/3 时 K=2 淘汰 A？Size 统计什么？
-- 4 号：页被 pin 为什么不能淘汰？dirty 如何避免丢失？FlushAll 如何避免死锁？
+- 4 号：页被 pin 为什么不能淘汰？dirty 如何避免丢失？FlushAll 如何避免死锁？<br>
+        ①这一页被淘汰后，持有者的指针还指向这同一块内存，会写到别的页上；持有者还没有写完、还没unpin，数据是不完整的，此刻写回磁盘，存的是不完整数据。<br>
+        ②Unpin时只置真，不归0；淘汰前必写回；先写回再清空。<br>
+        ③绕开公开接口，走内部现实（不调用FlushPgImp函数）<br>
 - 5 号：哪些边界是独立补充的？ASan 与 TSan 分别查什么？某缺陷如何稳定复现和证明已修复？
 
 各人根据实际代码补上回答与关键源码位置，避免只背概念。
