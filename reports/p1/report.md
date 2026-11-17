@@ -252,13 +252,241 @@ $$
 
 ## 4 LRU-K 设计
 
-3 号补充：
+本节由 3 号撰写。代码位置：`src/include/buffer/lru_k_replacer.h`、`src/buffer/lru_k_replacer.cpp`；
+用例位置：`test/buffer/lru_k_replacer_test.cpp`（共 13 个用例：原有 4 个 + 补充 9 个）。
 
-- 后退 K 距离、访问不足 K 次的优先级和成熟候选的排序依据。
-- 每帧历史、逻辑时间戳、可淘汰标记与 Size 的维护。
-- RecordAccess / SetEvictable / Evict / Remove 的状态转换。
-- K=2 的手算序列与代码输出；补充 K=1/3 的验证。
-- 同步方式、操作复杂度与实际采用的内部数据结构。
+### 4.1 淘汰依据：后退 k 距离
+
+实现维护一个只增不减的全局逻辑时钟 `current_timestamp_`：每次 `RecordAccess` 把一个新时间戳写进该帧的历史再让时钟加 1。时钟从不回退也不复用，因此全表时间戳互不相同。
+
+对帧 f，设其最近 m = min(k, 已访问次数) 次访问的时间戳升序为 hist[0] < … < hist[m−1]：
+
+- m = k（成熟帧）：后退 k 距离 = 当前时间戳 − hist[0]，hist[0] 就是倒数第 k 次访问的时间戳。
+- m < k（不成熟帧）：按定义后退 k 距离 = +∞。
+
+两档可以共用一个排序键：`std::pair<int, size_t>{hist.size() < k_ ? 0 : 1, hist.front()}`，`Evict` 在所有 `evictable_` 为真的帧里取这个二元组最小的那一个。这样排的依据是：
+
+1. 第一分量 0/1 把 +∞ 组整体排在成熟组之前，也就是访问不足 k 次的帧先淘汰；
+2. m < k 时 `hist.front()` 是首次访问时间，m = k 时是倒数第 k 次访问时间，两类各自要比较的就是它，一个 `front()` 够用；
+3. 同一类内 `front()` 越小，后退 k 距离越大，越该先淘汰；
+4. 比较只用时间戳，不拿当前时钟去做减法：同一轮 Evict 里所有候选的当前时钟相同，减法不改变相对次序，还能避开无符号相减下溢。
+
+成熟帧只比倒数第 k 次访问，与最近一次访问无关。这是 LRU-K 和 LRU 唯一的差别，也是最容易写错的地方：K=2 的反例在 4.4 第 4 次 Evict，K=3 的反例在 4.5。
+
+每个时间戳只由一次 `RecordAccess` 产生，两个帧不会有相同的 `front()`，所以代码里 `(cand == best && id < victim)` 这个按帧号兜底的平局判断实际不会触发，只是防御性写法，不影响结果。
+
+### 4.2 内部数据结构
+
+| 成员 | 类型 | 作用 |
+| --- | --- | --- |
+| `current_timestamp_` | `size_t` | 全局逻辑时钟，每访问一次加 1 |
+| `curr_size_` | `size_t` | 可淘汰帧数，即 `Size()` 的返回值 |
+| `replacer_size_` | `size_t` | 合法 frame_id 的上界（构造参数 num_frames） |
+| `k_` | `size_t` | K |
+| `latch_` | `std::mutex` | 保护全部公有方法 |
+| `frames_` | `std::unordered_map<frame_id_t, FrameInfo>` | 只保存出现过的帧 |
+| `FrameInfo::history_` | `std::list<size_t>` | 该帧最近的访问时间戳，升序，长度 ≤ k |
+| `FrameInfo::evictable_` | `bool` | 是否可被淘汰，**新条目默认 false** |
+
+构造函数里有 `BUSTUB_ASSERT(k_ > 0, "LRU-K requires k >= 1")`，K=0 的置换器没有意义。
+
+选型理由：
+
+- 用 `std::list` 而不是 `std::vector`：只需要尾部追加、头部丢弃（`push_back` / `pop_front`）和读 `front()`，不按下标随机访问。新访问进来后长度超过 k 就弹掉头部，头部永远是倒数第 k 次访问，`front()` 直接就是排序键。
+- 用 `std::unordered_map` 而不是数组：frame_id 的定义域是 [0, num_frames)，真正被访问的只是其中稀疏的一部分，哈希表只存出现过的帧。它还区分得开“从未出现”和“存在但不可淘汰”：`Remove` 对前者直接返回，对后者抛异常。
+
+### 4.3 四个写操作与 Size 的状态变化
+
+| 操作 | 前置检查 | 对 `frames_` 的影响 | 对 `curr_size_` 的影响 | 异常 |
+| --- | --- | --- | --- | --- |
+| `RecordAccess(f)` | 越界检查 | 不存在则新建 `FrameInfo`（`evictable_ = false`）；追加新时间戳；长度超过 k 弹掉头部 | **不变**（新帧默认不可淘汰） | `std::invalid_argument` |
+| `SetEvictable(f, b)` | 越界检查 | 用 `find` 查；不存在或状态已相同则**直接返回、不建条目**；否则改 `evictable_` | 不可淘汰 → 可淘汰：+1；反向：−1 | `std::invalid_argument` |
+| `Evict(&f)` | `curr_size_ == 0` 先返回 false | 删除被选中帧的整个条目（历史一并消失） | −1（仅成功时） | 无 |
+| `Remove(f)` | 越界检查 | 不存在则返回；存在但不可淘汰则抛；否则删除条目 | −1（仅成功时） | `std::invalid_argument` |
+| `Size()` | 无 | 不改 | 不改 | 无 |
+
+三条容易写错的语义（每条都有对应用例）：
+
+1. `Size()` 只数可淘汰帧，既不是历史长度，也不等于 `frames_.size()`。`RecordAccess` 不改变它：新帧默认不可淘汰，所以访问本身不增加 Size。
+2. `SetEvictable` 必须幂等，对从未出现过的帧不能建条目（用 `find` 而不是 `operator[]`）。否则会留下一个没有历史、后退 k 距离恒为 +∞ 的幽灵帧，将来被 Evict 选中却没有任何页与之对应。
+3. `Evict` 成功时已经连同历史一起删掉了该帧条目，所以上层（BPM）淘汰后不需要再调 `Remove`。`Remove` 只用于“指定某个帧、不管它的优先级”的场景，例如 `DeletePage`。对不可淘汰帧调 `Remove` 要抛异常，这一点和老师 Tutorial 的叙述不同，以头文件注释和 `docs/INTERFACES.md` 为准。
+
+### 4.4 K=2 的手算序列与代码输出
+
+场景与 `test/buffer/lru_k_replacer_test.cpp` 的 `LRUKReplacerTest.SampleTest` 完全相同：K=2，7 个帧，时间戳从 0 起。
+
+第一步：分配时间戳。先依次访问帧 1–6，再访问一次帧 1。
+
+| 访问序号 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 帧 | 1 | 2 | 3 | 4 | 5 | 6 | 1 |
+| 时间戳 | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+
+此时各帧历史与排序键（帧 1–5 可淘汰，帧 6 不可淘汰，`Size() = 5`）：
+
+| 帧 | history（≤ 2 个） | m | 类别 | 排序键 |
+| --- | --- | --- | --- | --- |
+| 1 | [0, 6] | 2 | 成熟 | (1, 0) |
+| 2 | [1] | 1 | +∞ | (0, 1) |
+| 3 | [2] | 1 | +∞ | (0, 2) |
+| 4 | [3] | 1 | +∞ | (0, 3) |
+| 5 | [4] | 1 | +∞ | (0, 4) |
+| 6 | [5] | 1 | +∞ | 不可淘汰，不参与 |
+
+三次 Evict 依次选中帧 2、3、4（+∞ 组按首次访问时间递增），`Size()` 从 5 降到 2，剩下帧 1 与帧 5。
+
+第二步：继续分配时间戳。访问 3、4、5、4：
+
+| 访问序号 | 8 | 9 | 10 | 11 |
+| --- | --- | --- | --- | --- |
+| 帧 | 3 | 4 | 5 | 4 |
+| 时间戳 | 7 | 8 | 9 | 10 |
+
+| 帧 | history | m | 类别 | 排序键 |
+| --- | --- | --- | --- | --- |
+| 1 | [0, 6] | 2 | 成熟 | (1, 0) |
+| 3 | [7] | 1 | +∞ | (0, 7) |
+| 4 | [8, 10] | 2 | 成熟 | (1, 8) |
+| 5 | [4, 9] | 2 | 成熟 | (1, 4) |
+
+第 4 次 Evict 选中帧 3：(0, 7) < (1, 0)。帧 1 的 `front()` 是 0，比帧 3 的 7 更旧，但帧 1 是成熟帧，第一分量 1 大于帧 3 的 0：+∞ 组整体优先，两类之间不比 `front()` 大小。这一步最容易写错。
+
+接着把帧 6 置为可淘汰，它只有一次访问（时间戳 5），排序键 (0, 5)，第 5 次 Evict 选中帧 6。
+
+再把帧 1 置为不可淘汰（Size 由 3 降到 2），第 6 次 Evict 在帧 4 (1, 8) 与帧 5 (1, 4) 中取更小的 front，选中帧 5。
+
+第三步：历史裁剪。再连续两次访问帧 1（时间戳 11、12）。K=2 时历史只保留最近 2 个，`push_back` 后长度变成 3 便把头部弹掉，帧 1 的历史从 [0, 6] 变成 [11, 12]，`front()` 从 0 变成 11，帧 1 因此重新变年轻：
+
+| 帧 | history | 排序键 |
+| --- | --- | --- |
+| 1 | [11, 12] | (1, 11) |
+| 4 | [8, 10] | (1, 8) |
+
+第 7 次 Evict 选中帧 4，第 8 次选中帧 1，`Size()` 归零；此后 `Evict` 返回 false。
+
+真实代码输出（把 main 上的 `lru_k_replacer.cpp` 和真实头文件编成可执行文件运行，逐条断言与上表一致）：
+
+```text
+=== 场景 1  K=2, num_frames=7  (重放 SampleTest, 时间戳从 0 起) ===
+   1  RecordAccess(1)-> t=0
+   2  RecordAccess(2)-> t=1
+   3  RecordAccess(3)-> t=2
+   4  RecordAccess(4)-> t=3
+   5  RecordAccess(5)-> t=4
+   6  RecordAccess(6)-> t=5
+        SetEvictable(1, true )   Size=0
+        SetEvictable(2, true )   Size=1
+        SetEvictable(3, true )   Size=2
+        SetEvictable(4, true )   Size=3
+        SetEvictable(5, true )   Size=4
+        SetEvictable(6, false)   Size=5
+        Size()=5  (期望 5)  OK
+  -- 再访问帧 1：1 变为成熟(2 次)，其余仍是 +inf --
+   7  RecordAccess(1)-> t=6
+  Evict() -> true , victim=2, Size=4   [+inf 组按最早时间戳：2 的 front=1]
+  Evict() -> true , victim=3, Size=3   [front=2]
+  Evict() -> true , victim=4, Size=2   [front=3; 6 不可淘汰]
+        Size()=2  (期望 2)  OK
+  -- 新建 3、4，更新 5、4：3 只有 1 次访问，仍在 +inf 组 --
+   8  RecordAccess(3)-> t=7
+   9  RecordAccess(4)-> t=8
+  10  RecordAccess(5)-> t=9
+  11  RecordAccess(4)-> t=10
+        SetEvictable(3, true )   Size=2
+        SetEvictable(4, true )   Size=3
+        Size()=4  (期望 4)  OK
+  Evict() -> true , victim=3, Size=3   [+inf 组先于成熟组：3 class=0 而 1 class=1(front=0)]
+        Size()=3  (期望 3)  OK
+  -- 帧 6 转为可淘汰：它只有 1 次访问(front=5) --
+        SetEvictable(6, true )   Size=3
+        Size()=4  (期望 4)  OK
+  Evict() -> true , victim=6, Size=3   [+inf 组]
+        Size()=3  (期望 3)  OK
+  -- 帧 1 转为不可淘汰 --
+        SetEvictable(1, false)   Size=3
+        Size()=2  (期望 2)  OK
+  Evict() -> true , victim=5, Size=1   [成熟组按第 2 次先前访问：5 的 front=4 < 4 的 front=8]
+        Size()=1  (期望 1)  OK
+  -- 再访问帧 1 两次：历史裁剪为最近 2 次，front 变为 11 --
+  12  RecordAccess(1)-> t=11
+  13  RecordAccess(1)-> t=12
+        SetEvictable(1, true )   Size=1
+        Size()=2  (期望 2)  OK
+  Evict() -> true , victim=4, Size=1   [front=8 < 1 的 front=11]
+        Size()=1  (期望 1)  OK
+  Evict() -> true , victim=1, Size=0   [最后只剩帧 1]
+        Size()=0  (期望 0)  OK
+  Evict() 在空置器上返回 false（期望 false）
+
+=== 场景 2  K=1（退化为普通 LRU）===
+   1  RecordAccess(0)-> t=0
+   2  RecordAccess(1)-> t=1
+   3  RecordAccess(0)-> t=2
+        SetEvictable(0, true )   Size=0
+        SetEvictable(1, true )   Size=1
+        Size()=2  (期望 2)  OK
+  Evict() -> true , victim=1, Size=1   [K=1 时排序键就是最近一次访问时间，即 LRU]
+
+=== 场景 3  K=3（最近访问更晚的帧仍然先出队）===
+   1  RecordAccess(0)-> t=0
+   2  RecordAccess(1)-> t=1
+   3  RecordAccess(1)-> t=2
+   4  RecordAccess(1)-> t=3
+   5  RecordAccess(0)-> t=4
+   6  RecordAccess(0)-> t=5
+        SetEvictable(0, true )   Size=0
+        SetEvictable(1, true )   Size=1
+        Size()=2  (期望 2)  OK
+  Evict() -> true , victim=0, Size=1   [0 的第 3 次先前访问是 t=0，1 的是 t=1；0 更大 -> 淘汰 0]
+
+ALL TRACE CHECKS PASS  (fails=0)
+```
+
+淘汰顺序 2、3、4、3、6、5、4、1 与 `SampleTest` 中的 8 处 `ASSERT_EQ` 逐条对应。
+
+### 4.5 K=1 与 K=3 的验证
+
+K=1 必须退化成普通 LRU。K=1 时历史长度恒为 1，排序键恒为 (1, 最近一次访问时间)，Evict 选最早被访问的帧，与教科书 LRU 一致；此时不存在 +∞ 组（m = min(1, 已访问次数) ≥ 1）。用例 `K1BehavesLikePlainLRU`，轨迹程序里 K=1 依次访问 0、1、0 后淘汰 1。
+
+**K=3 时要能区分最近访问与倒数第 3 次访问。** 用例 `ThirdPreviousAccessBeatsRecentAccess`：K=3，帧 0 在时间戳 0、4、5 被访问，帧 1 在时间戳 1、2、3 被访问。
+
+| 帧 | history | 倒数第 3 次访问 | 最近一次访问 |
+| --- | --- | --- | --- |
+| 0 | [0, 4, 5] | 0 | 5（更新） |
+| 1 | [1, 2, 3] | 1 | 3 |
+
+帧 0 的最近一次访问（5）比帧 1 的（3）更晚，按 LRU 该淘汰帧 1；但按 LRU-K 比较的是倒数第 3 次访问，0 < 1，所以**淘汰帧 0**。程序输出 `victim=0`，用例断言一致。这一条同时说明：K 的选择直接决定了谁被淘汰，K 越小越接近 LRU。
+
+### 4.6 同步方式与复杂度
+
+五个公有方法（`Evict`、`RecordAccess`、`SetEvictable`、`Remove`、`Size`）第一行都是 `std::scoped_lock<std::mutex> lock(latch_)`，临界区覆盖从查帧、改历史到改 `curr_size_` 的整个过程，检查与修改之间没有竞态窗口；`Evict` 的候选扫描也在锁内，不会出现两个线程同时选中同一受害帧。类用 `DISALLOW_COPY_AND_MOVE` 禁止拷贝，避免锁与容器被意外复制。
+
+| 操作 | 时间复杂度 | 说明 |
+| --- | --- | --- |
+| `RecordAccess` | O(1) 均摊 | 哈希表定位 + `list` 尾插/头删 |
+| `SetEvictable` | O(1) 均摊 | 只用 `find`，不建条目 |
+| `Remove` | O(1) 均摊 | 同上 |
+| `Size` | O(1) | 直接返回计数器 |
+| `Evict` | O(F) | F 为正在追踪的帧数，≤ 缓冲池帧数；线性扫描全部帧 |
+| 空间 | O(F·k) | 每帧至多 k 个时间戳 |
+
+`Evict` 是唯一的线性操作。可以维护两个有序结构（+∞ 组按首次访问时间、成熟组按倒数第 k 次访问时间）把单次淘汰降到 O(log F)，但本项目 F 很小（缓冲池默认 10 帧，最大用例 1000 帧），线性扫描常数更小、实现也更简单，所以没做。
+
+### 4.7 两个实现要点的取舍
+
+一、越界判定必须同时挡住负数与上界。三个写操作统一用
+
+```cpp
+if (frame_id < 0 || static_cast<size_t>(frame_id) >= replacer_size_) {
+  throw std::invalid_argument("...: frame id out of range");
+}
+```
+
+合法区间是 [0, replacer_size)，所以 `frame_id == num_frames` 与 `frame_id == -1` 都要抛。只写 `frame_id > replacer_size_` 会让 `-1` 和 `== num_frames` 都漏过，随后以负下标访问哈希表或越界写历史。用例 `InvalidFrameIdThrows` 与 5 号的 `ExactFrameBoundsAndUnknownState` 都覆盖了这两侧边界。
+
+二、另一种常见写法是两条链表，本实现换成一张表加一个可比较的排序键。那种写法把帧分成未满 k 次的一条、满 k 次的一条，每次访问把帧挪到链表尾。这样在成熟组里排的是最近一次访问的顺序，而 LRU-K 要的是倒数第 k 次访问的顺序，两者只在 k=1 时一致。要让链表顺序正确，就得在每次访问时额外维护第 k 次访问的时间戳并据此移动结点，复杂度反而上升。
+
+本实现把“该淘汰谁”收成一个二元组 `{是否成熟, front()}`：`history_` 只保留最近 k 个时间戳并保持升序，`front()` 就是该帧要比的那个时间戳，两类之间用第一分量隔开。四个写操作都成了局部更新，Evict 只需扫一遍取最小键，逻辑与 4.1 一致，也不会出现“链表位置和淘汰顺序不一致”这类隐性 bug。
 
 ## 5 缓冲池设计与流程图
 
