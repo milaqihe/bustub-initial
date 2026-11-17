@@ -107,7 +107,7 @@ auto ExtendibleHashTable<K, V>::IndexOf(const K &key) -> size_t {
 其计算过程可以表示为：
 
 $$
-\operatorname{IndexOf}(key)=\operatorname{Hash}(key)\land(2^g-1)
+\text{IndexOf}(key)=\text{Hash}(key)\land(2^g-1)
 $$
 
 其中，\(g\) 表示全局深度，`&` 表示按位与操作。
