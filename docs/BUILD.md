@@ -41,7 +41,7 @@ cmake --build build --target extendible_hash_table_test lru_k_replacer_test buff
 ./build/test/buffer_pool_manager_instance_test
 ```
 
-初始工程的业务方法尚未实现，缓冲池构造函数有显式异常。此阶段的失败不等同环境故障。模块完成后，应直接运行整个测试可执行文件；临时使用 `--gtest_filter` 定位问题，不能只通过筛选后的几个用例就验收。
+本仓库已完成 P1 三个模块及独立补充测试，共 48 项用例。直接运行整个测试目标可复现完整结果；临时使用 `--gtest_filter` 可定位单个用例。
 
 ## 1 号提供的 P1 集成入口
 
