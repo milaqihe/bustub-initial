@@ -1,64 +1,67 @@
-# BusTub Project 1 五人小组实验
+# BusTub Project 1 数据库小组实验
 
-本仓库用于完成可扩展哈希表、LRU-K 置换器和缓冲池管理器。默认分支为 `main`。当前数据库源码保留初始工程的待实现状态，按以下分工开发。
+[![Project 1](https://github.com/milaqihe/bustub-initial/actions/workflows/cmake.yml/badge.svg?branch=main)](https://github.com/milaqihe/bustub-initial/actions/workflows/cmake.yml?query=branch%3Amain)
 
-## 每位同学从这里开始
+本仓库为五人小组的 Project 1 提交，包含**可扩展哈希表、LRU-K 置换器、缓冲池管理器的完整源码和运行截图**。默认分支 `main` 为提交版本。
 
-先接受仓库协作者邀请，再克隆仓库。编号沿用小组分工图，GitHub 用户名由各位在自己的提交中使用。
+## 提交内容
 
-| 编号 | 职责与个人指南 | 主要源码或交付位置 | 开发分支 |
+| 内容 | 查看入口 |
+| --- | --- |
+| 实验报告、算法设计与流程图 | [实验报告](reports/p1/report.md) |
+| 运行截图 | [截图汇总](reports/p1/README.md#运行截图) · [图片目录](reports/p1/images/) |
+| 48 项测试与 ASan/TSan 验证记录 | [验收记录](reports/p1/acceptance.md) |
+| 最终集成、PR 与版本记录 | [集成记录](reports/p1/integration.md) |
+| 默认分支自动构建与测试 | [GitHub Actions](https://github.com/milaqihe/bustub-initial/actions/workflows/cmake.yml?query=branch%3Amain) |
+
+## 核心源码
+
+| 模块 | 头文件 | 实现 | 基础测试 |
 | --- | --- | --- | --- |
-| 1 号 | [组长与集成负责人](docs/team/member-01.md) | 根目录 `CMakeLists.txt`、构建说明、接口约定、合并与最终提交 | `team/01-integration` |
-| 2 号 | [可扩展哈希表负责人](docs/team/member-02.md) | [头文件](src/include/container/hash/extendible_hash_table.h)、[实现](src/container/hash/extendible_hash_table.cpp)、[单元测试](test/container/hash/extendible_hash_table_test.cpp) | `team/02-hash` |
-| 3 号 | [LRU-K 负责人](docs/team/member-03.md) | [头文件](src/include/buffer/lru_k_replacer.h)、[实现](src/buffer/lru_k_replacer.cpp)、[单元测试](test/buffer/lru_k_replacer_test.cpp) | `team/03-lruk` |
-| 4 号 | [缓冲池负责人](docs/team/member-04.md) | [头文件](src/include/buffer/buffer_pool_manager_instance.h)、[实现](src/buffer/buffer_pool_manager_instance.cpp)、[单元测试](test/buffer/buffer_pool_manager_instance_test.cpp) | `team/04-buffer-pool` |
-| 5 号 | [质量与验收负责人](docs/team/member-05.md) | [补充测试入口](test/p1_quality/README.md)、[验收与报告入口](reports/p1/README.md) | `team/05-quality` |
+| 可扩展哈希表 | [extendible_hash_table.h](src/include/container/hash/extendible_hash_table.h) | [extendible_hash_table.cpp](src/container/hash/extendible_hash_table.cpp) | [12 项测试](test/container/hash/extendible_hash_table_test.cpp) |
+| LRU-K 置换器 | [lru_k_replacer.h](src/include/buffer/lru_k_replacer.h) | [lru_k_replacer.cpp](src/buffer/lru_k_replacer.cpp) | [13 项测试](test/buffer/lru_k_replacer_test.cpp) |
+| 缓冲池管理器 | [buffer_pool_manager_instance.h](src/include/buffer/buffer_pool_manager_instance.h) | [buffer_pool_manager_instance.cpp](src/buffer/buffer_pool_manager_instance.cpp) | [13 项测试](test/buffer/buffer_pool_manager_instance_test.cpp) |
 
-各模块负责人同时负责实现与基础测试。1 号管理公共配置与合并，5 号独立补充边界、内存、并发和压力测试。4 号对接 2、3 号的固定接口。
+另有 [10 项独立补充测试](test/p1_quality/)，覆盖 K=3 排序、历史清理、边界帧、小容量换页、脏页重载、FlushAll、帧复用与并发。
 
-## 公共指南
+## 运行结果
 
-- [环境搭建与测试命令](docs/BUILD.md)：统一构建环境、三个测试目标、格式检查和打包。
-- [接口与状态约定](docs/INTERFACES.md)：准确函数名、返回值、LRU-K 决策、pin/dirty 与锁的约定。
-- [Git 协作与推送指南](docs/GIT_WORKFLOW.md)：首次克隆、设置自己的身份、同步、推送、开 PR 与冲突处理。
-- [五人任务与集成顺序](docs/team/README.md)：文件归属、阶段产物、依赖与合并条件。
+- P1 全量测试：**48/48 通过**（38 项基础测试 + 10 项独立补充测试）。
+- 2026-11-23 最终 ASan 复跑：48/48 通过；每项用例重复 20 次，**960 次执行全部通过**。
+- 格式与 lint 通过；Linux CI 同时执行 clang-tidy 和六文件打包。
+- 组员独立 TSan 运行：48/48 通过，原始截图保存在仓库。
 
-## 代码目录怎么找
+下图为组员提交的完整 ASan 运行结果；其他运行截图及其说明见[截图汇总](reports/p1/README.md#运行截图)。
 
-```text
-src/include/container/hash/extendible_hash_table.h  # 2 号：接口、Bucket 和成员变量
-src/container/hash/extendible_hash_table.cpp        # 2 号：哈希表实现
-src/include/buffer/lru_k_replacer.h                 # 3 号：接口和访问历史结构
-src/buffer/lru_k_replacer.cpp                       # 3 号：LRU-K 实现
-src/include/buffer/buffer_pool_manager.h            # 4 号阅读：公开调用包装层
-src/include/buffer/buffer_pool_manager_instance.h   # 4 号：具体实现类
-src/buffer/buffer_pool_manager_instance.cpp         # 4 号：六个页面操作
-src/include/storage/page/page.h                    # 4、5 号阅读：页与元数据
-src/include/storage/disk/disk_manager.h             # 4、5 号阅读：磁盘接口
-test/container/hash/extendible_hash_table_test.cpp  # 2 号基础测试
-test/buffer/lru_k_replacer_test.cpp                 # 3 号基础测试
-test/buffer/buffer_pool_manager_instance_test.cpp   # 4 号基础与集成测试
-test/p1_quality/                                   # 5 号补充测试位置
-reports/p1/                                       # 5 号报告、1 号最终提交记录
-```
+![P1 ASan 全量测试：48/48 通过](reports/p1/images/asan_check_p1.png)
 
-## 第一次运行
+## 复现方法
 
-安装环境见[构建指南](docs/BUILD.md)，所有命令从仓库根目录执行：
+安装 CMake 3.26 以上和 C++17 编译器，详细安装与 Linux Clang 14 配置见[构建指南](docs/BUILD.md)。在仓库根目录运行：
 
 ```bash
 git clone https://github.com/milaqihe/bustub-initial.git
 cd bustub-initial
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build --target extendible_hash_table_test lru_k_replacer_test buffer_pool_manager_instance_test -j 4
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUSTUB_SANITIZER=address
+cmake --build build --target check-p1 -j 4
 ```
 
-初始代码中，哈希表和 LRU-K 多个方法尚为空实现；缓冲池构造函数会抛 `NotImplementedException`。首次运行测试失败属于当前开发起点，不能据此宣称模块已经完成。4 号在实现完整后移除该异常。具体通过条件见每人的指南。
+运行质量测试和基础测试的统一入口为 `check-p1`。CI 使用 Ubuntu 22.04、Clang 14、CMake 3.31.10、Debug + ASan；TSan 使用独立构建目录，配置见[验收记录](reports/p1/acceptance.md)。
 
-本次实现范围为 Project 1。`clock_replacer`、普通 `lru_replacer`、磁盘哈希和 B+ 树等文件不属于这次三个模块。`DiskManager` 已提供。
+## 小组分工
 
-## 课程附带的 P1_src 代码
+| 编号 | 负责内容 |
+| --- | --- |
+| 1 号（milaqihe） | 公共环境与接口、CI、代码审阅合并、最终测试和提交整合 |
+| 2 号（wjy676） | 可扩展哈希表、基础测试、设计说明和拆桶示意图 |
+| 3 号（WUCROW2006） | LRU-K、基础测试、手算示例和设计说明 |
+| 4 号（yawyhdhdn） | 缓冲池、基础测试、操作流程图和状态图 |
+| 5 号（xxz00z） | 独立质量测试、ASan/TSan 运行截图和验收材料 |
 
-[P1_src 使用说明](references/README.md)中附有[原始压缩包](references/P1_src.zip)和[可直接浏览的六个源码文件](references/P1_src/)。它包含哈希表、LRU-K、缓冲池的已有实现，可用来阅读调用关系、对照思路和练习定位问题。
+## 课程源码包与参考资料
 
-这份代码与上面的 `src/` 初始工程分开放置，未覆盖开发源码。当前 CMake 构建和 `submit-p1` 仍使用 `src/` 中的六个文件。附带实现存在 LRU-K 排序、满桶更新和 FlushAll 重复加锁等问题，具体位置及各成员如何使用见[参考说明](references/README.md)。各人仍需按接口约定完成实现与测试。
+`cmake --build build --target submit-p1` 生成 `project1-submission.zip`，包含上述三组模块的六个 `.h/.cpp` 文件。成功的 Actions 运行也会提供同名提交包 artifact。老师可直接在本仓库查看全部源码与截图。
+
+课程附带的 [P1_src 原始代码与说明](references/README.md)单独存放在 `references/`，供对照学习；实际构建使用 `src/` 中的小组实现。
+
+协作记录保留在 [Git 工作流](docs/GIT_WORKFLOW.md)、[接口约定](docs/INTERFACES.md)和[五人分工指南](docs/team/README.md)。

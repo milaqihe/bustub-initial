@@ -1,6 +1,6 @@
 # 数据库 Project 1 实验报告
 
-填写人：5 号主笔，1—4 号提供对应内容。状态：报告编写中；1 号已补环境、集成问题、个人贡献与答辩说明，各模块设计和测试章节由对应成员继续完善。课程如有固定模板，由 5 号迁移内容、1 号核对提交格式。
+本报告汇总五人小组完成的可扩展哈希表、LRU-K 和缓冲池实现、测试结果与运行截图。最终整理日期：2026-11-23。源码和运行截图随报告提交至项目默认分支 `main`。
 
 ## 1 实验目标与任务
 
@@ -18,13 +18,13 @@
 | 格式与静态检查 | clang-format 14、clang-tidy 14、cpplint | clang-format 14.0.6、cpplint；clang-tidy 结果采用 Linux CI |
 | 构建与内存检测 | Debug + AddressSanitizer，开启泄漏检测 | Debug + AddressSanitizer |
 
-截至 2026-11-16，`main` 的三个模块集成版本为 `dfa3c63`，已有 38 项基础测试通过；`team/05-quality` 的 `bd966e1` 在此基础上加入 10 项补充测试，CI 共 48 项通过。两阶段版本、PR 和执行记录见 [integration.md](integration.md)，最终提交版本在报告汇总合并后确定。
+三个模块共有 38 项基础测试，独立质量测试增加 10 项，合计 48 项。2026-11-23 由组长在 Debug + ASan 环境完整复跑并执行每项用例重复 20 次的稳定性测试；执行结果见 [acceptance.md](acceptance.md)，运行截图见[截图与交付入口](README.md)。模块与报告的集成过程见 [integration.md](integration.md)。
 
-安装步骤见[构建指南](../../docs/BUILD.md)。安装相应工具后，从仓库根目录按以下命令复现 Linux CI 使用的配置；使用质量分支可运行当前补充测试。
+安装步骤见[构建指南](../../docs/BUILD.md)。安装相应工具后，从仓库根目录按以下命令复现 Linux CI 使用的配置：
 
 ```bash
-git switch team/05-quality
-git pull --ff-only origin team/05-quality
+git switch main
+git pull --ff-only origin main
 git rev-parse HEAD
 
 cmake -S . -B build/asan-clang14 -DCMAKE_BUILD_TYPE=Debug \
@@ -39,9 +39,9 @@ cmake --build build/asan-clang14 --target check-clang-tidy-p1
 
 `check-p1` 先构建三个基础测试目标及符合命名约定的补充测试，再通过 CTest 的 `p1` 标签执行用例；单个用例超时为 120 秒。失败返回非零，诊断输出由 CI 保留。`p1_test.sh` 也可复用已经配置的构建目录运行同一入口。
 
-TSan 使用独立构建目录，以 `-DBUSTUB_SANITIZER=thread` 编译并运行；具体命令和实际结果由 5 号记录在验收文档中。使用 Clang 19 等其他编译器复测时，新建相应构建目录并记录实际版本，格式与静态检查继续以 CI 的 14 版工具结果为准。
+TSan 使用独立构建目录，以 `-DBUSTUB_SANITIZER=thread` 编译并运行；5 号提交的运行截图显示 48/48 通过，具体记录见验收文档。使用 Clang 19 等其他编译器复测时，新建相应构建目录并记录实际版本，格式与静态检查继续以 CI 的 14 版工具结果为准。
 
-最终版本合入 `main` 后，由 1 号复跑上述测试和检查，再执行 `cmake --build <最终构建目录> --target submit-p1`，生成仓库根目录的 `project1-submission.zip`。压缩包只包含 CMake 中 `P1_FILES` 指定的哈希表、LRU-K、缓冲池三对 `.h/.cpp`，共六个文件。
+1 号完成测试与集成后，执行 `cmake --build <最终构建目录> --target submit-p1`，生成仓库根目录的 `project1-submission.zip`。压缩包只包含 CMake 中 `P1_FILES` 指定的哈希表、LRU-K、缓冲池三对 `.h/.cpp`，共六个文件。
 
 ## 3 哈希表设计
 
@@ -271,9 +271,9 @@ $$
 3. 同一类内 `front()` 越小，后退 k 距离越大，越该先淘汰；
 4. 比较只用时间戳，不拿当前时钟去做减法：同一轮 Evict 里所有候选的当前时钟相同，减法不改变相对次序，还能避开无符号相减下溢。
 
-成熟帧只比倒数第 k 次访问，与最近一次访问无关。这是 LRU-K 和 LRU 唯一的差别，也是最容易写错的地方：K=2 的反例在 4.4 第 4 次 Evict，K=3 的反例在 4.5。
+成熟帧比较倒数第 k 次访问，而普通 LRU 比较最近一次访问。K=2 的手算过程见 4.4，K=3 的对比示例见 4.5。
 
-每个时间戳只由一次 `RecordAccess` 产生，两个帧不会有相同的 `front()`，所以代码里 `(cand == best && id < victim)` 这个按帧号兜底的平局判断实际不会触发，只是防御性写法，不影响结果。
+每个时间戳只由一次 `RecordAccess` 产生，两个帧不会有相同的 `front()`，所以代码里 `(cand == best && id < victim)` 这个按帧号兜底的平局判断实际不会触发，用于确定性处理平局，不影响本实验序列的结果。
 
 ### 4.2 内部数据结构
 
@@ -502,7 +502,7 @@ if (frame_id < 0 || static_cast<size_t>(frame_id) >= replacer_size_) {
 | `latch_` | `std::mutex` | 保护以上所有结构，六个接口入口统一加锁 |
 | `next_page_id_` | `std::atomic<page_id_t>` | 由 `AllocatePage()` 递增分配新页号 |
 
-帧的选取逻辑集中在一个私有辅助函数 `AcquireFrame` 中，由 `NewPage` 与 `FetchPage` 的未命中路径共用，避免两处重复同一套淘汰代码。
+帧的选取逻辑集中在一个内部辅助函数 `AcquireFrame` 中，由 `NewPage` 与 `FetchPage` 的未命中路径共用，避免两处重复同一套淘汰代码。
 
 ### 5.2 帧分配：AcquireFrame
 
@@ -593,6 +593,7 @@ stateDiagram-v2
     state "Pinned：被引用（pin_count_ > 0）" as Pinned
     state "Clean：可淘汰且干净（pin_count_ == 0 且 is_dirty_ == false）" as Clean
     state "Dirty：可淘汰且为脏（pin_count_ == 0 且 is_dirty_ == true）" as Dirty
+    state "Reusing：选中的帧，等待装入新页" as Reusing
 
     [*] --> Free: 构造时 pool_size_ 个帧全部填入 free_list_
     Free --> Pinned: NewPage / FetchPage 未命中取到该帧，pin_count_ = 1
@@ -602,16 +603,20 @@ stateDiagram-v2
     Clean --> Pinned: FetchPage 命中，SetEvictable(frame_id, false)
     Dirty --> Pinned: FetchPage 命中，SetEvictable(frame_id, false)
     Dirty --> Clean: FlushPage / FlushAllPages 写回并清 is_dirty_
-    Clean --> Free: 被 Evict 选中（不写回）或 DeletePage 清理后归还
-    Dirty --> Free: 被 Evict 选中则先 WritePage 再清空；DeletePage 归还则不写回
+    Clean --> Free: DeletePage 清理并归还 free_list_
+    Dirty --> Free: DeletePage 清理并归还 free_list_
+    Clean --> Reusing: Evict 选中，移除旧映射并清理
+    Dirty --> Reusing: Evict 选中，先写回再移除旧映射并清理
+    Reusing --> Pinned: NewPage 或 FetchPage 装入新页并固定
 ```
 
-四个状态的含义：
+五个状态的含义（Reusing 是持有 BPM 锁期间的内部过渡状态）：
 
 - **Free**：`page_id_ == INVALID_PAGE_ID`，位于 `free_list_`；
 - **Pinned**：`pin_count_ > 0`，`replacer_` 中标记为不可淘汰，任何淘汰都不会选它；
 - **Clean**：`pin_count_ == 0 && is_dirty_ == false`，是 `Evict` 的候选且淘汰时无需写回；
 - **Dirty**：`pin_count_ == 0 && is_dirty_ == true`，仍是候选，但被选中时必须先 `WritePage`。
+- **Reusing**：帧已从替换器移除，由当前 New/Fetch 调用立即复用；它不会重新加入 `free_list_`。
 
 `DeletePage` 只在 `pin_count_ == 0` 时才能执行，`pin > 0` 会返回 `false`，因为持有者仍在读写的帧一旦被清空，其指针就会落到别人的数据上。
 
@@ -630,19 +635,30 @@ stateDiagram-v2
 
 ## 6 测试方法与结果
 
-5 号从[验收记录](acceptance.md)提取真实结果，表格包含测试目标、输入规模、环境、通过/失败数量、Sanitizer 和耗时。明确基础测试、补充边界、并发与压力各自验证什么。
+采用“模块基础测试 + 独立边界测试 + ASan/TSan + 重复执行”的验证方式。完整执行记录、对应版本及参数见 [acceptance.md](acceptance.md)，[运行截图](README.md)随代码保存在仓库中。
 
-| 实验项 | 被测代码版本 | 参数与命令 | 实际结果 |
-| --- | --- | --- | --- |
-| 三组基础测试 | 待填 | 待填 | 未执行 |
-| 补充边界测试 | 待填 | 待填 | 未执行 |
-| ASan | 待填 | 待填 | 未执行 |
-| TSan | 待填 | 待填 | 未执行 |
-| 并发与压力 | 待填 | 待填 | 未执行 |
+| 测试套件 | 数量 | 主要覆盖 |
+| --- | --- | --- |
+| ExtendibleHashTableTest | 12 | 插入、更新、删除、拆分、目录深度、桶数量及并发 |
+| LRUKReplacerTest | 13 | K=1/2/3、淘汰顺序、计数、历史清理、非法帧与并发 |
+| BufferPoolManagerInstanceTest | 13 | 页面六操作、二进制数据、dirty、换页、并发与综合场景 |
+| P1QualityLRUKTest | 4 | 第 K 次访问排序、Remove 后复用、边界帧编号、多线程精确计数 |
+| P1QualityBPMTest | 6 | 容量 1/2、全 pinned、脏页重载、FlushAll、删除复用、固定种子换页与并发 |
+| **合计** | **48** | P1 全部已注册用例 |
+
+| 实验项 | 环境与执行方式 | 实际结果 |
+| --- | --- | --- |
+| 完整 P1 功能与 ASan 复跑 | 2026-11-23，组长本机 AppleClang 21，Debug + ASan，`check-p1` | 48/48 通过 |
+| 重复稳定性测试 | 同一 ASan 构建，`ctest -L '^p1$' --repeat until-fail:20` | 每项用例执行 20 次，共 960 次全部通过，耗时 90.34 秒 |
+| 格式与 lint | `check-p1-format`、`check-p1-lint` | 通过 |
+| Linux CI | Ubuntu 22.04、Clang 14、Debug + ASan | 48/48；格式、lint、clang-tidy 与打包通过，最终记录见 Actions |
+| TSan | 5 号 2026-11-15 独立 Linux 运行截图 | 截图显示 48/48 通过，耗时 10.17 秒 |
+
+固定种子换页测试实际使用 2 个缓冲帧、100 个页面、种子 `20261115`，先逐页写入并解除固定，再打乱页序读回并逐项比较。独立页和共享页并发测试均使用 4 个线程，每线程 100 次操作；共享页写入时使用 Page 的写锁。每个 CTest 用例设置 120 秒超时。
 
 ## 7 问题与修复
 
-选择实际遇到的问题，按“触发输入→错误现象→根因→修复→回归结果”描述，并引用修复 PR 或提交。未发生的问题不写成亲自调试经历。
+以下记录项目实际遇到并解决的构建与集成问题。
 
 ### 1 号：统一构建与集成中解决的问题
 
@@ -654,22 +670,17 @@ stateDiagram-v2
 
 | 编号 | 负责内容 | 实际 PR/提交与结果 |
 | --- | --- | --- |
-| 1 | 环境、接口、公共配置、审阅合并、最终联调和提交包 | [PR #2](https://github.com/milaqihe/bustub-initial/pull/2) 建立 P1 构建、CI、接口与打包入口；审阅合并 [#1](https://github.com/milaqihe/bustub-initial/pull/1)、[#3](https://github.com/milaqihe/bustub-initial/pull/3)、[#4](https://github.com/milaqihe/bustub-initial/pull/4)，本地复跑哈希表 12 项、LRU-K 13 项、缓冲池 13 项；修复缓冲池注释格式 `ed7f342`。最终验收、打包与课程提交在报告汇总合并后执行。 |
-| 2 | 可扩展哈希表、基础测试与算法说明 | 待填 |
-| 3 | LRU-K、基础测试与淘汰示例 | 待填 |
-| 4 | 缓冲池六操作、基础与集成测试、状态流程 | 待填 |
-| 5 | 补充测试、Sanitizer、缺陷复测、报告与答辩整理 | 待填 |
+| 1 | 环境、接口、公共配置、审阅合并、最终联调和提交包 | [PR #2](https://github.com/milaqihe/bustub-initial/pull/2) 建立 P1 构建、CI、接口与打包入口；审阅合并 [#1](https://github.com/milaqihe/bustub-initial/pull/1)、[#3](https://github.com/milaqihe/bustub-initial/pull/3)、[#4](https://github.com/milaqihe/bustub-initial/pull/4)，本地复跑哈希表 12 项、LRU-K 13 项、缓冲池 13 项；修复缓冲池注释格式 `ed7f342`。完成最终测试复跑、报告汇总、源码及运行截图的默认分支交付。 |
+| 2 | 可扩展哈希表、基础测试与算法说明 | [PR #1](https://github.com/milaqihe/bustub-initial/pull/1)，实现及 12 项基础测试；`043b0c8`、`b0b7f79` 补充第 3 章和拆桶示意图。 |
+| 3 | LRU-K、基础测试与淘汰示例 | [PR #3](https://github.com/milaqihe/bustub-initial/pull/3)，13 项测试通过；`cc2dc2b` 补充第 4 章、K=1/2/3 示例及复杂度说明。 |
+| 4 | 缓冲池六操作、基础与集成测试、状态流程 | [PR #4](https://github.com/milaqihe/bustub-initial/pull/4)，13 项基础测试通过；`fbb0e9c` 补充第 5 章流程与状态图。 |
+| 5 | 补充测试、Sanitizer、缺陷复测、报告与答辩整理 | `56945da`、`79b91b5` 提交 10 项独立补充用例；`bd966e1` 提交验收记录与 ASan、TSan、CI、格式检查截图。 |
 
 ## 9 答辩准备
 
 - **1 号：为什么按这个顺序集成？** 缓冲池通过哈希表维护 `page_id → frame_id` 映射，通过 LRU-K 选择可淘汰帧，因此先合入公共构建配置，再分别验收哈希表与 LRU-K，最后审阅已经接入真实依赖的缓冲池。各模块基础测试通过后，再接入 5 号的独立补充测试，便于定位单模块问题和调用约定问题。实际顺序与版本见 [integration.md](integration.md) 的 PR 表。
 - **1 号：如何复现测试与打包？** 先同步要验收的分支并记录提交号，按第 2 章配置 Debug + ASan，执行 `check-p1`、格式、lint 和 clang-tidy；TSan 在独立目录运行。最终 `main` 验收通过后执行 `submit-p1`，根据 `CMakeLists.txt` 的 `P1_FILES` 核对压缩包的六个源码文件。`test/CMakeLists.txt` 负责测试发现、P1 标签与超时，`cmake/Project1.cmake` 定义统一测试入口，`.github/workflows/cmake.yml` 记录 CI 的实际执行顺序。
-- 2 号：何时拆桶、何时翻倍？为什么满桶更新已有键不拆分？
-- 3 号：为何 A=1/9、B=2/3 时 K=2 淘汰 A？Size 统计什么？
-- 4 号：页被 pin 为什么不能淘汰？dirty 如何避免丢失？FlushAll 如何避免死锁？<br>
-        ①这一页被淘汰后，持有者的指针还指向这同一块内存，会写到别的页上；持有者还没有写完、还没unpin，数据是不完整的，此刻写回磁盘，存的是不完整数据。<br>
-        ②Unpin时只置真，不归0；淘汰前必写回；先写回再清空。<br>
-        ③绕开公开接口，走内部现实（不调用FlushPgImp函数）<br>
-- 5 号：哪些边界是独立补充的？ASan 与 TSan 分别查什么？某缺陷如何稳定复现和证明已修复？
-
-各人根据实际代码补上回答与关键源码位置，避免只背概念。
+- **2 号：何时拆桶、何时翻倍？** 新键插入满桶时拆桶；桶局部深度等于全局深度时先翻倍目录。已有键先更新值，因此满桶更新不需要增加桶。代码位置：`src/container/hash/extendible_hash_table.cpp` 的 `Bucket::Insert`、`Insert`、`RedistributeBucket`。
+- **3 号：为何 A=1/9、B=2/3 时 K=2 淘汰 A？Size 统计什么？** A 的倒数第二次访问为 1，早于 B 的 2，因此 A 的后退 K 距离更大；两者均可淘汰且历史都达到 K 次时先选 A。`Size` 只统计可淘汰帧。代码位置：`src/buffer/lru_k_replacer.cpp` 的 `Evict`、`SetEvictable`、`Size`。
+- **4 号：为什么 pinned 页不能淘汰？** 调用者仍持有页指针，复用帧会让该指针访问另一页的数据。`UnpinPage(false)` 保留先前的 dirty 标记，脏页淘汰前先写回，再清映射并复用。`FlushAllPgsImp` 持锁直接遍历写回，避免调用会再次获取相同锁的 `FlushPgImp`。代码位置：`src/buffer/buffer_pool_manager_instance.cpp`。
+- **5 号：独立补充测试验证什么？ASan 与 TSan 各查什么？** 补充用例独立规定 K=3 排序、历史重置、小容量帧复用、FlushAll 和并发的预期结果；ASan 检测内存错误，TSan 检测数据竞争。出现失败时保留输入、被测提交与日志，修复后重跑相同用例。代码位置：`test/p1_quality/`，结果见 `acceptance.md`。

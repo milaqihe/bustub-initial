@@ -1,6 +1,6 @@
 # 1 号集成记录
 
-更新日期：2026-11-16。三个核心模块已合入 `main`，当前模块集成版本为 `dfa3c63`。本次在 `team/05-quality` 汇总报告中的环境、集成过程与 1 号贡献；质量分支的已验证版本为 `bd966e1`，最终验收和课程提交在报告汇总合并后进行。
+最终整理日期：2026-11-23。三个核心模块通过 PR #1、#3、#4 完成集成；本次汇总独立质量测试、五人报告、设计图与运行截图，默认分支 `main` 作为课程提交入口。报告汇总基线为 `cc2dc2b`。
 
 ## 环境与构建
 
@@ -54,7 +54,7 @@ Linux CI 另外执行 `check-clang-tidy-p1`，统一采用 14 版工具。本机
 | 2026-11-10 | [#3 LRU-K](https://github.com/milaqihe/bustub-initial/pull/3)，3 号 | 审阅历史、淘汰顺序、计数与清理；本地 Debug + ASan 复跑 13/13 通过 | `1094b91` |
 | 2026-11-13 | [#4 缓冲池](https://github.com/milaqihe/bustub-initial/pull/4)，4 号 | 审阅六操作与 AcquireFrame；缓冲池 13/13、三模块合计 38/38 通过；1 号修正 24 处注释空格 `ed7f342` 后 CI 全绿 | `dfa3c63` |
 
-三个模块的 GitHub 批准与合并均使用组长 `milaqihe` 账号。质量与报告内容继续在 `team/05-quality` 汇总，由 1 号统一审阅合入 `main`。
+三个模块的 GitHub 批准与合并均使用组长 `milaqihe` 账号。质量与报告在 `team/05-quality` 汇总，最终通过汇总 PR 合入默认分支；各成员原始提交保留在历史中。
 
 ## 实际验证结果
 
@@ -64,15 +64,17 @@ Linux CI 另外执行 `check-clang-tidy-p1`，统一采用 14 版工具。本机
 | `main` 的 `dfa3c63` | Ubuntu 22.04 / Clang 14 / Debug + ASan | [CI 全部通过](https://github.com/milaqihe/bustub-initial/actions/runs/43398140831)：构建、基础测试、格式/lint、clang-tidy 和打包 |
 | `team/05-quality` 的 `79b91b5` | 同一 CI，加入补充测试 | [48/48 通过](https://github.com/milaqihe/bustub-initial/actions/runs/43697051038)，含 38 项基础测试、6 项 BPM 补充测试和 4 项 LRU-K 补充测试；全部检查与打包成功 |
 | `team/05-quality` 的 `bd966e1` | 同一 CI，加入验收文档与截图 | [48/48 通过](https://github.com/milaqihe/bustub-initial/actions/runs/43722662432)，测试总耗时 4.33 秒；全部检查与打包成功 |
-| 5 号本地 ASan / TSan | 由 5 号执行并提交截图 | [ASan 截图](images/asan_check_p1.png)与[TSan 截图](images/tsan_check_p1.png)均显示 48/48 通过；实际工具版本、被测提交号与重复/压力运行记录由验收文档补齐 |
+| 5 号本地 ASan / TSan | 2026-11-15 独立运行并提交截图 | [ASan 截图](images/asan_check_p1.png)与[TSan 截图](images/tsan_check_p1.png)均显示 48/48 通过，截图随 `bd966e1` 提交 |
+| 报告汇总基线 `cc2dc2b` | 完整三个设计章节与原有 48 项测试 | [CI 全部通过](https://github.com/milaqihe/bustub-initial/actions/runs/44069233922) |
+| 2026-11-23 最终复跑 | 1 号本机 Debug + ASan | 48/48 通过，4.77 秒；每项用例重复 20 次，共 960 次全部通过，90.34 秒；格式和 lint 通过 |
 
-CI 使用 `BUSTUB_SANITIZER=address`，其结果覆盖 ASan 及配置中的泄漏检测。TSan 为独立本地验收记录，不归入 CI 的 ASan 检查结果。当前补充测试位于质量分支，最终结果以报告汇总合并后的 `main` 复跑为准。本地原始输出位于 `build/integration/`，构建目录由 Git 忽略。
+CI 使用 `BUSTUB_SANITIZER=address`，其结果覆盖 ASan 及配置中的泄漏检测。TSan 为独立本地验收记录，不归入 CI 的 ASan 检查结果。最终默认分支的完整构建、48 项测试、静态检查与打包结果由 [main 的 Actions](https://github.com/milaqihe/bustub-initial/actions/workflows/cmake.yml?query=branch%3Amain)按实际提交关联。本地原始输出位于 `build/integration/`，构建目录由 Git 忽略。
 
 ## 合并与最终验收
 
-2—4 号分别补报告第 3—5 章的实际设计、示例和图；5 号汇总第 6 章测试结果并完善验收记录。各人补本人贡献与答辩内容，1 号统一环境与版本信息。
+2—4 号已完成报告第 3—5 章和设计图，5 号提交独立质量用例、验收记录与运行截图；1 号统一环境、测试结果、贡献及答辩说明，并整理仓库首页与截图入口。清除了未包含任何用例的空白哈希质量测试占位文件，哈希表仍由原有 12 项基础用例验证，总数保持 48。
 
-汇总 PR 合入 `main` 后，1 号记录最终提交号，执行 P1 完整测试、格式、lint 和 Linux clang-tidy，并与 5 号验收记录对应；通过后生成正式包：
+源码、测试与报告以默认分支为准，按以下命令复现测试和六文件打包：
 
 ```bash
 git switch main
@@ -95,4 +97,4 @@ src/include/buffer/buffer_pool_manager_instance.h
 src/buffer/buffer_pool_manager_instance.cpp
 ```
 
-截至本次更新，CI 已能生成六文件提交包。正式交付将在报告汇总与最终验收完成后执行，届时补记最终 main 提交号、验收结果、包名、课程提交时间与回执。
+交付方式遵循老师“在登记的项目链接上提交代码和运行截图”的要求：[项目首页](https://github.com/milaqihe/bustub-initial)提供源码、完整报告、[截图汇总](README.md#运行截图)与[验收记录](acceptance.md)。最终提交及完整 CI 状态可从 main 的提交历史与 Actions 页面直接查看，成功的 CI 运行提供 `project1-submission` 压缩包 artifact。
