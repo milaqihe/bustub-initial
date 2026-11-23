@@ -668,13 +668,13 @@ stateDiagram-v2
 
 ## 8 小组分工与贡献
 
-| 编号 | 负责内容 | 实际 PR/提交与结果 |
-| --- | --- | --- |
-| 1 | 环境、接口、公共配置、审阅合并、最终联调和提交包 | [PR #2](https://github.com/milaqihe/bustub-initial/pull/2) 建立 P1 构建、CI、接口与打包入口；审阅合并 [#1](https://github.com/milaqihe/bustub-initial/pull/1)、[#3](https://github.com/milaqihe/bustub-initial/pull/3)、[#4](https://github.com/milaqihe/bustub-initial/pull/4)，本地复跑哈希表 12 项、LRU-K 13 项、缓冲池 13 项；修复缓冲池注释格式 `ed7f342`。完成最终测试复跑、报告汇总、源码及运行截图的默认分支交付。 |
-| 2 | 可扩展哈希表、基础测试与算法说明 | [PR #1](https://github.com/milaqihe/bustub-initial/pull/1)，实现及 12 项基础测试；`043b0c8`、`b0b7f79` 补充第 3 章和拆桶示意图。 |
-| 3 | LRU-K、基础测试与淘汰示例 | [PR #3](https://github.com/milaqihe/bustub-initial/pull/3)，13 项测试通过；`cc2dc2b` 补充第 4 章、K=1/2/3 示例及复杂度说明。 |
-| 4 | 缓冲池六操作、基础与集成测试、状态流程 | [PR #4](https://github.com/milaqihe/bustub-initial/pull/4)，13 项基础测试通过；`fbb0e9c` 补充第 5 章流程与状态图。 |
-| 5 | 补充测试、Sanitizer、缺陷复测、报告与答辩整理 | `56945da`、`79b91b5` 提交 10 项独立补充用例；`bd966e1` 提交验收记录与 ASan、TSan、CI、格式检查截图。 |
+| 编号 | 姓名 | 负责内容 | 实际 PR/提交与结果 |
+| --- | --- | --- | --- |
+| 1 | 何佳绮 | 环境、接口、公共配置、审阅合并、最终联调和提交包 | [PR #2](https://github.com/milaqihe/bustub-initial/pull/2) 建立 P1 构建、CI、接口与打包入口；审阅合并 [#1](https://github.com/milaqihe/bustub-initial/pull/1)、[#3](https://github.com/milaqihe/bustub-initial/pull/3)、[#4](https://github.com/milaqihe/bustub-initial/pull/4)，本地复跑哈希表 12 项、LRU-K 13 项、缓冲池 13 项；修复缓冲池注释格式 `ed7f342`。完成最终测试复跑、报告汇总、源码及运行截图的默认分支交付。 |
+| 2 | 吴佳忆 | 可扩展哈希表、基础测试与算法说明 | [PR #1](https://github.com/milaqihe/bustub-initial/pull/1)，实现及 12 项基础测试；`043b0c8`、`b0b7f79` 补充第 3 章和拆桶示意图。 |
+| 3 | 吴雅卓 | LRU-K、基础测试与淘汰示例 | [PR #3](https://github.com/milaqihe/bustub-initial/pull/3)，13 项测试通过；`cc2dc2b` 补充第 4 章、K=1/2/3 示例及复杂度说明。 |
+| 4 | 梁怡莲 | 缓冲池六操作、基础与集成测试、状态流程 | [PR #4](https://github.com/milaqihe/bustub-initial/pull/4)，13 项基础测试通过；`fbb0e9c` 补充第 5 章流程与状态图。 |
+| 5 | 肖子瑞 | 补充测试、Sanitizer、缺陷复测、报告与答辩整理 | `56945da`、`79b91b5` 提交 10 项独立补充用例；`bd966e1` 提交验收记录与 ASan、TSan、CI、格式检查截图。 |
 
 ## 9 答辩准备
 
