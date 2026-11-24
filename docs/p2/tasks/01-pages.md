@@ -1,6 +1,6 @@
 # 任务 1：页面基础与公共集成
 
-认领人：待填写姓名 / GitHub。开发分支：`p2/01-pages`，PR 目标：`project2`。
+负责人：**吴佳忆**；GitHub：`wjy676`。开发分支：`p2/01-pages`，PR 目标：`project2`。
 
 你实现 BPlusTreePage、InternalPage、LeafPage 的页面原语，和 2/3 号先确定 size、容量、定位和搬移接口，并维护 P2 的公共构建入口。三类页面是其他任务的共同依赖，优先提交一个小的基础 PR。
 

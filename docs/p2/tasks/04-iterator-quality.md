@@ -1,6 +1,6 @@
 # 任务 4：迭代器、独立测试与报告汇总
 
-认领人：待填写姓名 / GitHub。开发分支：`p2/04-iterator-quality`，PR 目标：`project2`。
+负责人：**吴雅卓**；GitHub：`WUCROW2006`。开发分支：`p2/04-iterator-quality`，PR 目标：`project2`。
 
 你实现范围扫描的 IndexIterator 和树的 Begin/End，并负责独立补充测试、验收记录及报告汇总。各模块负责人仍提交自己的基础测试和模块说明。
 

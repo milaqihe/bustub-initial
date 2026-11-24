@@ -1,6 +1,6 @@
 # 任务 5：页面级并发控制
 
-认领人：待填写姓名 / GitHub。开发分支：`p2/05-concurrency`，PR 目标：`project2`。
+负责人：**何佳绮**；GitHub：`milaqihe`。开发分支：`p2/05-concurrency`，PR 目标：`project2`。
 
 你把单线程树改造成并发 B+ 树。先设计锁规则和编写并发用例，单线程基线合入 project2 后再分批加入锁，保留 2/3 号已有算法。
 

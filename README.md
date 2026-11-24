@@ -2,21 +2,21 @@
 
 本分支用于第二次实验，基于已完成的 Project 1（`fb905e4`），继续使用其 Buffer Pool Manager。第一轮提交保留在 [main](https://github.com/milaqihe/bustub-initial/tree/main)。
 
-## 先选任务，再进入自己的分支
+## 本轮分工与开发分支
 
-本轮任务重新认领，编号表示任务包，尚未指定姓名。
+本轮分工已确认，编号对应第二次实验任务。组长为 **何佳绮（任务 5）**，公共页面与构建由任务 1 负责，组长统一审阅合并。
 
-| 任务 | 主要职责 | 开发分支 | 详细任务 |
-| --- | --- | --- | --- |
-| 1 | 公共页、内部页、叶子页及公共集成 | `p2/01-pages` | [任务 1](docs/p2/tasks/01-pages.md) |
-| 2 | 单点查询、插入、分裂与新根 | `p2/02-search-insert` | [任务 2](docs/p2/tasks/02-search-insert.md) |
-| 3 | 删除、借元素、合并与根收缩 | `p2/03-delete` | [任务 3](docs/p2/tasks/03-delete.md) |
-| 4 | 迭代器、独立测试与报告汇总 | `p2/04-iterator-quality` | [任务 4](docs/p2/tasks/04-iterator-quality.md) |
-| 5 | 页面级并发控制与并发验证 | `p2/05-concurrency` | [任务 5](docs/p2/tasks/05-concurrency.md) |
+| 任务 | 负责人 / GitHub | 主要职责 | 开发分支 | 详细任务 |
+| --- | --- | --- | --- | --- |
+| 1 | 吴佳忆 / `wjy676` | 公共页、内部页、叶子页及公共集成 | `p2/01-pages` | [任务 1](docs/p2/tasks/01-pages.md) |
+| 2 | 梁怡莲 / `yawyhdhdn` | 单点查询、插入、分裂与新根 | `p2/02-search-insert` | [任务 2](docs/p2/tasks/02-search-insert.md) |
+| 3 | 肖子瑞 / `xxz00z` | 删除、借元素、合并与根收缩 | `p2/03-delete` | [任务 3](docs/p2/tasks/03-delete.md) |
+| 4 | 吴雅卓 / `WUCROW2006` | 迭代器、独立测试与报告汇总 | `p2/04-iterator-quality` | [任务 4](docs/p2/tasks/04-iterator-quality.md) |
+| 5 | 何佳绮 / `milaqihe` | 页面级并发控制与并发验证 | `p2/05-concurrency` | [任务 5](docs/p2/tasks/05-concurrency.md) |
 
-**公共集成分支为 `project2`，五个任务的 PR 均以它为目标分支。** 每个任务分支已经包含本轮指南，按自己的任务页面开始即可。
+**公共集成分支为 `project2`，五个任务的 PR 均以它为目标分支。** 每个任务分支已经包含本轮指南及负责人信息，按自己的任务页面开始即可。
 
-- [任务总览、认领与开发顺序](docs/p2/README.md)
+- [任务总览、成员与开发顺序](docs/p2/README.md)
 - [文件归属与接口交接](docs/p2/INTERFACES.md)
 - [P2 构建、实际测试目标与打包](docs/p2/BUILD.md)
 - [同步、推送和 PR 操作](docs/p2/GIT_WORKFLOW.md)

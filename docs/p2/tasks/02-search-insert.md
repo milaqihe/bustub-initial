@@ -1,6 +1,6 @@
 # 任务 2：单点查询、插入与分裂
 
-认领人：待填写姓名 / GitHub。开发分支：`p2/02-search-insert`，PR 目标：`project2`。
+负责人：**梁怡莲**；GitHub：`yawyhdhdn`。开发分支：`p2/02-search-insert`，PR 目标：`project2`。
 
 你负责单线程 B+ 树的查找与插入主链，提供 3/4/5 号复用的找叶子页方法，并正确处理多层分裂和新根。
 

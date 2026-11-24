@@ -1,18 +1,18 @@
-# Project 2 五人任务与认领
+# Project 2 五人任务与分工
 
 依据课程《Tutorial for Project2》整理：第 1 页给出两个 Checkpoint，第 22—23 页说明迭代器与并发任务，第 34—35 页列出限制和测试。本页是本组的协作分工；课程要求以老师发布的教程和通知为准。
 
-## 分支与认领
+## 分支与成员
 
-公共集成分支：[`project2`](https://github.com/milaqihe/bustub-initial/tree/project2)。任务编号本轮重新认领，不自动沿用 P1 的人员对应关系。组员选好后，在认领表填写姓名和 GitHub 用户名，再提交到自己的任务分支。
+公共集成分支：[`project2`](https://github.com/milaqihe/bustub-initial/tree/project2)。以下为小组已确认的 P2 分工，任务编号与 P1 的人员顺序不同。本轮组长为何佳绮（任务 5）；吴佳忆（任务 1）负责页面和公共构建，何佳绮统一安排审阅、合并与交付。
 
 | 任务 | 姓名 / GitHub | 职责 | 分支与指南 |
 | --- | --- | --- | --- |
-| 1 | 待认领 | 三类页面、公共接口、构建与集成 | [`p2/01-pages`](https://github.com/milaqihe/bustub-initial/tree/p2/01-pages) · [指南](tasks/01-pages.md) |
-| 2 | 待认领 | 查询、插入与分裂 | [`p2/02-search-insert`](https://github.com/milaqihe/bustub-initial/tree/p2/02-search-insert) · [指南](tasks/02-search-insert.md) |
-| 3 | 待认领 | 删除与再平衡 | [`p2/03-delete`](https://github.com/milaqihe/bustub-initial/tree/p2/03-delete) · [指南](tasks/03-delete.md) |
-| 4 | 待认领 | 迭代器、独立验收及报告汇总 | [`p2/04-iterator-quality`](https://github.com/milaqihe/bustub-initial/tree/p2/04-iterator-quality) · [指南](tasks/04-iterator-quality.md) |
-| 5 | 待认领 | 并发查询、插入、删除与锁管理 | [`p2/05-concurrency`](https://github.com/milaqihe/bustub-initial/tree/p2/05-concurrency) · [指南](tasks/05-concurrency.md) |
+| 1 | 吴佳忆 / `wjy676` | 三类页面、公共接口、构建与集成 | [`p2/01-pages`](https://github.com/milaqihe/bustub-initial/tree/p2/01-pages) · [指南](tasks/01-pages.md) |
+| 2 | 梁怡莲 / `yawyhdhdn` | 查询、插入与分裂 | [`p2/02-search-insert`](https://github.com/milaqihe/bustub-initial/tree/p2/02-search-insert) · [指南](tasks/02-search-insert.md) |
+| 3 | 肖子瑞 / `xxz00z` | 删除与再平衡 | [`p2/03-delete`](https://github.com/milaqihe/bustub-initial/tree/p2/03-delete) · [指南](tasks/03-delete.md) |
+| 4 | 吴雅卓 / `WUCROW2006` | 迭代器、独立验收及报告汇总 | [`p2/04-iterator-quality`](https://github.com/milaqihe/bustub-initial/tree/p2/04-iterator-quality) · [指南](tasks/04-iterator-quality.md) |
+| 5 | 何佳绮 / `milaqihe` | 并发查询、插入、删除与锁管理 | [`p2/05-concurrency`](https://github.com/milaqihe/bustub-initial/tree/p2/05-concurrency) · [指南](tasks/05-concurrency.md) |
 
 每位成员同时提交本人基础测试、模块说明和必要的运行截图。4 号汇总独立测试和报告，组长负责安排审阅、公共分支合并与最终交付。
 
