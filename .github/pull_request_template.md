@@ -1,5 +1,19 @@
-DO NOT PUSH PROJECT SOLUTIONS PUBLICLY.
+## P2 任务与目标
 
-And especially do NOT open pull requests with project solutions!
+- 任务编号 / 姓名：
+- 目标分支：project2（最终整合 PR 才选择 main）
+- 基于 project2 的提交号：
 
-Please be considerate of this free educational resource.
+## 功能与修改范围
+
+说明完成的函数、辅助接口和涉及的共享文件。
+
+## 测试
+
+填写实际运行环境、完整命令、用例数量及通过/失败结果。删除测试需显式启用 disabled 用例；依赖尚未齐备时如实列出。
+
+## 交接
+
+- 相关负责人：
+- 模块说明与截图位置：
+- 尚未解决的依赖或问题：
