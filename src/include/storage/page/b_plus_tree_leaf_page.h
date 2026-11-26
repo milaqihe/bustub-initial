@@ -49,8 +49,38 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto GetNextPageId() const -> page_id_t;
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
+  auto KeyIndex(const KeyType &key, const KeyComparator &comparator) const -> int;
+  auto GetItem(int index) const -> const MappingType &;
+
+  auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> int;
+  auto Lookup(const KeyType &key, ValueType *value, const KeyComparator &comparator) const -> bool;
+  auto RemoveAndDeleteRecord(const KeyType &key, const KeyComparator &comparator) -> int;
+  void Remove(int index);
+
+  void MoveHalfTo(BPlusTreeLeafPage *recipient, BufferPoolManager *buffer_pool_manager = nullptr);
+  void MoveAllTo(BPlusTreeLeafPage *recipient);
+  void MoveAllTo(BPlusTreeLeafPage *recipient, const KeyType &middle_key, BufferPoolManager *buffer_pool_manager);
+  void MoveFirstToEndOf(BPlusTreeLeafPage *recipient);
+  void MoveFirstToEndOf(BPlusTreeLeafPage *recipient, const KeyType &middle_key,
+                        BufferPoolManager *buffer_pool_manager);
+  void MoveLastToFrontOf(BPlusTreeLeafPage *recipient);
+  void MoveLastToFrontOf(BPlusTreeLeafPage *recipient, const KeyType &middle_key,
+                         BufferPoolManager *buffer_pool_manager);
 
  private:
+  // The page stores a tail array in the bytes following the fixed header.
+  // Accessing it through this pointer avoids statically indexing array_[1].
+  auto Array() -> MappingType * {
+    return reinterpret_cast<MappingType *>(reinterpret_cast<char *>(this) + LEAF_PAGE_HEADER_SIZE);
+  }
+  auto Array() const -> const MappingType * {
+    return reinterpret_cast<const MappingType *>(reinterpret_cast<const char *>(this) + LEAF_PAGE_HEADER_SIZE);
+  }
+
+  void CopyNFrom(MappingType *items, int size);
+  void CopyLastFrom(const MappingType &item);
+  void CopyFirstFrom(const MappingType &item);
+
   page_id_t next_page_id_;
   // Flexible array member for page data.
   MappingType array_[1];
